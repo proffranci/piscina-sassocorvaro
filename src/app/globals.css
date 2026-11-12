@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+/* Palette "acqua": profondo come la vasca, luminoso come la superficie */
+@theme {
+  --color-abisso: #0b2e45;
+  --color-vasca: #12557a;
+  --color-acqua: #0e9bb0;
+  --color-riflesso: #7fd6e3;
+  --color-schiuma: #eef6f9;
+  --color-corsia: #f2b84b;
+  --font-sans: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background: var(--color-schiuma);
+  color: var(--color-abisso);
+}
+
+/* Le righe delle corsie, usate come decorazione */
+.righe-corsia {
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent 0,
+    transparent 46px,
+    rgba(255, 255, 255, 0.08) 46px,
+    rgba(255, 255, 255, 0.08) 48px
+  );
+}
