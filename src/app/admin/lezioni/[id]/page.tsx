@@ -6,6 +6,7 @@ import { richiediStaff } from "@/lib/sessione";
 import { etichettaGiorno, oraDi } from "@/lib/formato";
 import { contaPosti, type StatoPrenotazione, type TipoPrenotazione } from "@/lib/posti";
 import { aggiungiIngresso, confermaPerConto, liberaPosto } from "../actions";
+import { BottoneInvio } from "@/components/BottoneInvio";
 
 type Prenotazione = {
   id: string;
@@ -134,7 +135,11 @@ export default async function LezionePage({
                     <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
                       <span>
                         <span className="font-medium">{nomeDi(p)}</span>
-                        {p.profili?.telefono && <span className="ml-2 text-slate-500">{p.profili.telefono}</span>}
+                        {p.profili?.telefono && (
+                          <a href={`tel:${p.profili.telefono.replace(/\s/g, "")}`} className="ml-2 text-vasca underline">
+                            {p.profili.telefono}
+                          </a>
+                        )}
                       </span>
                       {!iniziata && (p.stato === "riservata" || p.stato === "confermata") && (
                         <span className="flex gap-2">
@@ -142,14 +147,14 @@ export default async function LezionePage({
                             <form action={confermaPerConto}>
                               <input type="hidden" name="id" value={p.id} />
                               <input type="hidden" name="lezione_id" value={lezione.id} />
-                              <button className={bottoneSecondario}>Conferma</button>
+                              <BottoneInvio className={bottoneSecondario}>Conferma</BottoneInvio>
                             </form>
                           )}
                           <form action={liberaPosto}>
                             <input type="hidden" name="id" value={p.id} />
                             <input type="hidden" name="lezione_id" value={lezione.id} />
                             <input type="hidden" name="tipo" value={p.tipo} />
-                            <button className={bottoneSecondario}>{p.tipo === "abbonamento" ? "Libera posto" : "Annulla"}</button>
+                            <BottoneInvio className={bottoneSecondario}>{p.tipo === "abbonamento" ? "Libera posto" : "Annulla"}</BottoneInvio>
                           </form>
                         </span>
                       )}
@@ -162,7 +167,7 @@ export default async function LezionePage({
         </div>
 
         {!iniziata && !lezione.annullata && (
-          <Card className="h-fit">
+          <Card className="order-first h-fit lg:order-none">
             <h2 className="mb-1 font-semibold">Aggiungi ingresso singolo</h2>
             <p className="mb-4 text-xs text-slate-500">
               Per chi telefona o si presenta in reception. {c.liberi === 0 && "Ora non ci sono posti liberi."}
@@ -185,9 +190,9 @@ export default async function LezionePage({
                 <label className={etichetta} htmlFor="nome_ospite">Nome e cognome (senza account)</label>
                 <input id="nome_ospite" name="nome_ospite" placeholder="Es. Anna Bianchi" className={campo} />
               </div>
-              <button className={`${bottone} w-full`} disabled={c.liberi === 0}>
+              <BottoneInvio className={`${bottone} w-full`} disabled={c.liberi === 0}>
                 Aggiungi
-              </button>
+              </BottoneInvio>
             </form>
           </Card>
         )}

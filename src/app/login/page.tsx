@@ -1,5 +1,6 @@
 import { accedi } from "./actions";
 import { Avviso, Logo, bottone, campo, etichetta, parametro, type SearchParams } from "@/components/ui";
+import { BottoneInvio } from "@/components/BottoneInvio";
 
 const MESSAGGI: Record<string, string> = {
   credenziali: "Email o password non corrette.",
@@ -14,7 +15,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
   const errore = MESSAGGI[parametro(params.errore) ?? ""];
 
   return (
-    <main className="grid min-h-dvh lg:grid-cols-2">
+    <main className="spazio-sopra grid min-h-screen min-h-dvh lg:grid-cols-2">
       <section className="righe-corsia relative hidden flex-col justify-between bg-abisso p-10 text-white lg:flex">
         <Logo chiaro />
         <div>
@@ -49,7 +50,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
               <label htmlFor="password" className={etichetta}>Password</label>
               <input id="password" name="password" type="password" autoComplete="current-password" required className={campo} />
             </div>
-            <button type="submit" className={`${bottone} w-full`}>Entra</button>
+            <BottoneInvio className={`${bottone} w-full`}>Entra</BottoneInvio>
           </form>
         </div>
       </section>

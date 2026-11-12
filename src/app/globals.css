@@ -1,19 +1,18 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-/* Palette "acqua": profondo come la vasca, luminoso come la superficie */
-@theme {
-  --color-abisso: #0b2e45;
-  --color-vasca: #12557a;
-  --color-acqua: #0e9bb0;
-  --color-riflesso: #7fd6e3;
-  --color-schiuma: #eef6f9;
-  --color-corsia: #f2b84b;
-  --font-sans: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
+html {
+  /* Niente ingrandimento automatico del testo quando si ruota il telefono */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
-  background: var(--color-schiuma);
-  color: var(--color-abisso);
+  background: #eef6f9;
+  color: #0b2e45;
+  /* Tocco senza il riquadro grigio di Android/iOS */
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* Le righe delle corsie, usate come decorazione */
@@ -25,4 +24,21 @@ body {
     rgba(255, 255, 255, 0.08) 46px,
     rgba(255, 255, 255, 0.08) 48px
   );
+}
+
+/* Spazio per la "tacca" e la barra in basso degli iPhone */
+.spazio-sotto {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
+
+/* Aperta come app sull'iPhone, il contenuto passa sotto l'orologio:
+   questo spazio lo tiene visibile (nel browser normale vale 0) */
+.spazio-sopra {
+  padding-top: env(safe-area-inset-top, 0px);
 }

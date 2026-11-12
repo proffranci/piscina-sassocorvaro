@@ -2,6 +2,7 @@ import { Avviso, Badge, Card, Titolo, bottone, bottoneSecondario, campo, etichet
 import { richiediStaff } from "@/lib/sessione";
 import { GIORNI, nomeGiorno, ora } from "@/lib/formato";
 import { aggiornaCapienza, aggiungiOrario, cambiaAttivoOrario } from "./actions";
+import { BottoneInvio } from "@/components/BottoneInvio";
 
 type Orario = { id: string; giorno_settimana: number; ora_inizio: string; durata_minuti: number; attivo: boolean };
 type Corso = { id: string; nome: string; capienza: number; attivo: boolean; orari_corso: Orario[] };
@@ -40,7 +41,7 @@ export default async function CorsiPage({ searchParams }: { searchParams: Search
                     <label className={etichetta} htmlFor={`cap-${corso.id}`}>Posti per lezione</label>
                     <input id={`cap-${corso.id}`} name="capienza" type="number" min={1} defaultValue={corso.capienza} className={`${campo} w-28`} />
                   </div>
-                  <button className={bottoneSecondario}>Salva</button>
+                  <BottoneInvio className={bottoneSecondario}>Salva</BottoneInvio>
                 </form>
               </div>
 
@@ -59,7 +60,7 @@ export default async function CorsiPage({ searchParams }: { searchParams: Search
                         <form action={cambiaAttivoOrario}>
                           <input type="hidden" name="id" value={o.id} />
                           <input type="hidden" name="attivo" value={o.attivo ? "no" : "si"} />
-                          <button className={bottoneSecondario}>{o.attivo ? "Sospendi" : "Riattiva"}</button>
+                          <BottoneInvio className={bottoneSecondario}>{o.attivo ? "Sospendi" : "Riattiva"}</BottoneInvio>
                         </form>
                       </span>
                     </li>
@@ -85,7 +86,7 @@ export default async function CorsiPage({ searchParams }: { searchParams: Search
                   <label className={etichetta} htmlFor={`d-${corso.id}`}>Durata (min)</label>
                   <input id={`d-${corso.id}`} name="durata_minuti" type="number" min={15} step={5} defaultValue={45} className={`${campo} w-28`} />
                 </div>
-                <button className={bottone}>Aggiungi orario</button>
+                <BottoneInvio className={bottone}>Aggiungi orario</BottoneInvio>
               </form>
             </Card>
           );

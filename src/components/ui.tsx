@@ -2,15 +2,17 @@ import type { ReactNode } from "react";
 
 // Stili riutilizzabili: cosi tutte le pagine hanno lo stesso aspetto.
 export const campo =
-  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-acqua focus:ring-2 focus:ring-riflesso/60";
+  // text-base sul telefono: sotto i 16px l'iPhone fa zoom sul campo quando lo tocchi
+  "w-full min-h-[44px] rounded-lg border border-slate-300 bg-white px-3 py-2 text-base outline-none focus:border-acqua focus:ring-2 focus:ring-riflesso/60 sm:min-h-0 sm:text-sm";
 
 export const etichetta = "mb-1 block text-sm font-medium text-abisso";
 
 export const bottone =
-  "inline-flex items-center justify-center rounded-lg bg-acqua px-4 py-2 text-sm font-semibold text-white hover:bg-vasca transition-colors";
+  // min-h-[44px]: la misura minima consigliata per toccare comodamente con il dito
+  "inline-flex min-h-[44px] items-center justify-center rounded-lg bg-acqua px-4 py-2 text-base font-semibold text-white transition-colors hover:bg-vasca disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0 sm:text-sm";
 
 export const bottoneSecondario =
-  "inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-abisso hover:bg-schiuma transition-colors";
+  "inline-flex min-h-[44px] items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-abisso transition-colors hover:bg-schiuma disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
