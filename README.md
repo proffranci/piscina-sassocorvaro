@@ -38,6 +38,7 @@ src/app/area           area del cliente
 
 - [x] **Fase 1** – login, ruoli, utenti, corsi e orari, abbonamenti con i 2 giorni fissi
 - [x] **Fase 2** – lezioni generate dal calendario, conferma entro le 17:00, ingressi singoli, dashboard
-- [ ] **Fase 2b** – promemoria via email
+- [x] **Avvisi nell'app** – notifiche ai clienti, solleciti di pagamento, promemoria automatici, pagina "Oggi" con cronologia per lo staff
+- [ ] **Fase 2b** – promemoria anche via email e notifiche push sul telefono
 - [ ] **Fase 3** – prenotazione corsie
 - [ ] **Fase 4** – WhatsApp, report, rifiniture grafiche
