@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
+import { supabaseUrl } from "./config";
 
 // Client con la chiave SEGRETA: scavalca la Row Level Security.
 // Lo usiamo solo per creare gli account dei clienti, e SEMPRE dopo aver
@@ -7,8 +8,8 @@ import { createClient } from "@supabase/supabase-js";
 // "server-only" fa fallire la build se qualcuno lo importa in una pagina del browser.
 export function creaClientAdmin() {
   return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SECRET_KEY!,
+    supabaseUrl(),
+    (process.env.SUPABASE_SECRET_KEY ?? "").trim(),
     { auth: { persistSession: false, autoRefreshToken: false } },
   );
 }

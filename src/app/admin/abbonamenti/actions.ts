@@ -54,7 +54,14 @@ export async function creaAbbonamento(formData: FormData) {
     errore(pagina, "Non sono riuscito a salvare gli orari dell'abbonamento.");
   }
 
-  redirect(`/admin/abbonamenti?ok=${encodeURIComponent("Abbonamento creato.")}`);
+  // Riserviamo subito i posti nelle lezioni già in calendario
+  // (senza aspettare il giro notturno del database)
+  const { error: erroreCalendario } = await supabase.rpc("genera_lezioni", { p_giorni: 28 });
+  const messaggio = erroreCalendario
+    ? "Abbonamento creato. I posti verranno riservati stanotte in automatico."
+    : "Abbonamento creato e posti riservati nelle prossime lezioni.";
+
+  redirect(`/admin/abbonamenti?ok=${encodeURIComponent(messaggio)}`);
 }
 
 export async function cambiaPagato(formData: FormData) {
