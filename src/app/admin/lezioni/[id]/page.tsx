@@ -54,6 +54,20 @@ export default async function LezionePage({
     supabase.from("profili").select("id, nome, cognome").eq("attivo", true).order("cognome"),
   ]);
 
+  // Se il database risponde con un errore lo mostriamo, invece di una pagina vuota:
+  // così capiamo subito cosa non va (es. uno script SQL non eseguito)
+  if (lezioneRes.error) {
+    console.error("[lezione] errore nel caricamento:", lezioneRes.error);
+    return (
+      <>
+        <Titolo azione={<Link href="/admin" className={bottoneSecondario}>← Panoramica</Link>}>Lezione</Titolo>
+        <Avviso
+          errore={`Non riesco a caricare la lezione. Dettaglio tecnico: ${lezioneRes.error.message} (${lezioneRes.error.code ?? "?"})`}
+        />
+      </>
+    );
+  }
+
   const lezione = lezioneRes.data as unknown as Lezione | null;
   if (!lezione) notFound();
   const utenti = (utentiRes.data ?? []) as unknown as { id: string; nome: string; cognome: string }[];
