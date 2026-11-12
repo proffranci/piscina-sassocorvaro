@@ -1,9 +1,9 @@
 import { BottoneWhatsApp, testiWhatsApp } from "@/components/WhatsApp";
 import { BottoneInvio } from "@/components/BottoneInvio";
-import { Avviso, Badge, Card, Titolo, bottone, campo, etichetta, parametro, type SearchParams } from "@/components/ui";
+import { Avviso, Badge, Card, Titolo, bottone, bottoneSecondario, campo, etichetta, parametro, type SearchParams } from "@/components/ui";
 import { richiediStaff } from "@/lib/sessione";
 import { etichettaGiorno, oraDi } from "@/lib/formato";
-import { inviaAvviso } from "./actions";
+import { inviaAvviso, ricordaConferme } from "./actions";
 import { GeneraChiavi } from "./GeneraChiavi";
 import { pushConfigurate } from "@/lib/push";
 
@@ -15,6 +15,12 @@ type Inviata = {
   creata_il: string;
   letta_il: string | null;
   profili: { nome: string; cognome: string; telefono: string | null } | null;
+};
+
+type InSospeso = {
+  id: string;
+  lezioni: { inizio: string; scadenza_conferma: string; annullata: boolean; corsi: { nome: string } | null };
+  profili: { nome: string; cognome: string; telefono: string | null; canale_notifica: string } | null;
 };
 
 // Modelli pronti: un tocco e il testo è già scritto
@@ -44,14 +50,29 @@ export default async function AvvisiPage({ searchParams }: { searchParams: Searc
   const sp = await searchParams;
   const modello = MODELLI[parametro(sp.modello) ?? ""] ?? { titolo: "", testo: "", tipo: "promemoria", destinatari: "tutti" };
 
-  const [clientiRes, inviateRes] = await Promise.all([
+  const adesso = new Date();
+  const fra48 = new Date(adesso.getTime() + 48 * 3_600_000);
+  const [clientiRes, inviateRes, sospesoRes] = await Promise.all([
     supabase.from("profili").select("id, nome, cognome").eq("ruolo", "utente").eq("attivo", true).order("cognome"),
     supabase
       .from("notifiche")
       .select("id, titolo, testo, tipo, creata_il, letta_il, profili!notifiche_utente_id_fkey(nome, cognome, telefono)")
       .order("creata_il", { ascending: false })
       .limit(40),
+    supabase
+      .from("prenotazioni")
+      .select(
+        "id, lezioni!inner(inizio, scadenza_conferma, annullata, corsi(nome)), profili(nome, cognome, telefono, canale_notifica)",
+      )
+      .eq("stato", "riservata")
+      .eq("lezioni.annullata", false)
+      .gt("lezioni.scadenza_conferma", adesso.toISOString())
+      .lte("lezioni.scadenza_conferma", fra48.toISOString()),
   ]);
+  const inSospeso = ((sospesoRes.data ?? []) as unknown as InSospeso[]).sort(
+    (a, b) => a.lezioni.inizio.localeCompare(b.lezioni.inizio) || (a.profili?.cognome ?? "").localeCompare(b.profili?.cognome ?? ""),
+  );
+  const suWhatsApp = inSospeso.filter((p) => p.profili?.canale_notifica === "whatsapp").length;
   const pushOk = pushConfigurate() && Boolean(process.env.PUSH_SEGRETO);
   const clienti = (clientiRes.data ?? []) as unknown as { id: string; nome: string; cognome: string }[];
   const inviate = (inviateRes.data ?? []) as unknown as Inviata[];
@@ -65,6 +86,59 @@ export default async function AvvisiPage({ searchParams }: { searchParams: Searc
         Ogni mattina il sistema manda anche da solo il promemoria &quot;conferma entro le 17&quot; e gli avvisi di scadenza abbonamento.
       </p>
       <Avviso errore={parametro(sp.errore)} ok={parametro(sp.ok)} />
+
+      {/* ---------- Conferme in sospeso ---------- */}
+      <Card className={`mb-6 ${inSospeso.length > 0 ? "border-corsia" : ""}`}>
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="font-semibold">Ricorda di confermare</h2>
+            <p className="text-sm text-slate-600">
+              {inSospeso.length === 0
+                ? "Nessuno deve confermare nelle prossime 48 ore."
+                : `${inSospeso.length} ${inSospeso.length === 1 ? "persona deve" : "persone devono"} ancora confermare${
+                    suWhatsApp > 0 ? `, di cui ${suWhatsApp} preferisce WhatsApp` : ""
+                  }.`}
+            </p>
+          </div>
+          {inSospeso.length > 0 && (
+            <form action={ricordaConferme}>
+              <input type="hidden" name="prenotazione_id" value="tutte" />
+              <BottoneInvio className={`${bottone} w-full sm:w-auto`}>🔔 Ricorda a tutti dall&apos;app</BottoneInvio>
+            </form>
+          )}
+        </div>
+        {inSospeso.length > 0 && (
+          <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 text-sm">
+            {inSospeso.map((p) => {
+              const l = p.lezioni;
+              const lezione = `${l.corsi?.nome ?? "lezione"} ${etichettaGiorno(l.inizio).toLowerCase()} alle ${oraDi(l.inizio)}`;
+              const preferisceWa = p.profili?.canale_notifica === "whatsapp";
+              return (
+                <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
+                  <span className="min-w-0">
+                    <strong>{p.profili ? `${p.profili.cognome} ${p.profili.nome}` : "—"}</strong>{" "}
+                    <span className="text-xs text-slate-500">· preferisce {preferisceWa ? "💬 WhatsApp" : "🔔 app"}</span>
+                    <span className="block text-xs text-slate-500">
+                      {lezione} · entro le {oraDi(l.scadenza_conferma)}
+                    </span>
+                  </span>
+                  <span className="flex shrink-0 gap-2">
+                    <BottoneWhatsApp
+                      telefono={p.profili?.telefono}
+                      etichetta={preferisceWa ? "WhatsApp" : ""}
+                      testo={testiWhatsApp.conferma(p.profili?.nome ?? "", lezione, oraDi(l.scadenza_conferma))}
+                    />
+                    <form action={ricordaConferme}>
+                      <input type="hidden" name="prenotazione_id" value={p.id} />
+                      <BottoneInvio className={bottoneSecondario}>{preferisceWa ? "🔔" : "🔔 App"}</BottoneInvio>
+                    </form>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
         <Card>

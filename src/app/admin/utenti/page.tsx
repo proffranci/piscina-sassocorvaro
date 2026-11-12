@@ -56,7 +56,7 @@ export default async function UtentiPage({ searchParams }: { searchParams: Searc
                     ✉️ {u.email}
                   </a>
                 )}
-                <p className="text-slate-500">Avvisi via {u.canale_notifica === "whatsapp" ? "WhatsApp" : "email"}</p>
+                <p className="text-slate-500">Preferisce {u.canale_notifica === "whatsapp" ? "WhatsApp 💬" : "l'app 🔔"}</p>
               </div>
               {u.telefono && (
                 <div className="mt-3">
@@ -101,7 +101,7 @@ export default async function UtentiPage({ searchParams }: { searchParams: Searc
                   <div>{u.email}</div>
                   {u.telefono && <div>{u.telefono}</div>}
                 </td>
-                <td className="px-4 py-3">{u.canale_notifica === "whatsapp" ? "WhatsApp" : "Email"}</td>
+                <td className="px-4 py-3">{u.canale_notifica === "whatsapp" ? "💬 WhatsApp" : "🔔 App"}</td>
                 <td className="px-4 py-3">
                   <Badge tono={u.ruolo === "utente" ? "neutro" : "attenzione"}>{u.ruolo}</Badge>
                 </td>
