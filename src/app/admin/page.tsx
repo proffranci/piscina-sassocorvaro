@@ -125,6 +125,9 @@ export default async function AdminHome({ searchParams }: { searchParams: Search
                         )}
                       </div>
                       <BarraPosti conteggio={c} legenda />
+                      <p className="mt-3 text-right text-sm font-medium text-vasca">
+                        Partecipanti e prenotazioni →
+                      </p>
                     </Card>
                   </Link>
                 );
