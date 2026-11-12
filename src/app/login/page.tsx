@@ -4,6 +4,9 @@ import { Avviso, Logo, bottone, campo, etichetta, parametro, type SearchParams }
 const MESSAGGI: Record<string, string> = {
   credenziali: "Email o password non corrette.",
   campi: "Inserisci email e password.",
+  non_confermata: "L'account non è ancora confermato. Contatta la reception.",
+  configurazione: "Il servizio non è configurato correttamente. Riprova più tardi.",
+  troppi_tentativi: "Troppi tentativi. Attendi qualche minuto e riprova.",
 };
 
 export default async function LoginPage({ searchParams }: { searchParams: SearchParams }) {
