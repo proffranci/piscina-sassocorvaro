@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { supabaseChiavePubblica, supabaseUrl } from "./config";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Gira prima di ogni pagina: rinnova la sessione (i token scadono dopo un'ora)
@@ -7,8 +8,8 @@ export async function aggiornaSessione(request: NextRequest) {
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    supabaseUrl(),
+    supabaseChiavePubblica(),
     {
       cookies: {
         getAll() {

@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { supabaseChiavePubblica, supabaseUrl } from "./config";
 import { cookies } from "next/headers";
 
 // Client Supabase usato nelle pagine e nelle azioni lato server.
@@ -7,8 +8,8 @@ export async function creaClientServer() {
   const cookieStore = await cookies();
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    supabaseUrl(),
+    supabaseChiavePubblica(),
     {
       cookies: {
         getAll() {

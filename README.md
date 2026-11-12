@@ -13,6 +13,7 @@ src/lib/supabase/      i collegamenti a Supabase (utente normale e chiave segret
 src/lib/sessione.ts    "chi è entrato?" e i controlli staff/admin
 src/app/login          pagina di accesso
 src/app/admin          area di gestione (staff e admin)
+src/app/admin/lezioni  dettaglio di una lezione: conferme, posti, ingressi dalla reception
 src/app/area           area del cliente
 ```
 
@@ -36,6 +37,7 @@ src/app/area           area del cliente
 ## Fasi
 
 - [x] **Fase 1** – login, ruoli, utenti, corsi e orari, abbonamenti con i 2 giorni fissi
-- [ ] **Fase 2** – lezioni generate dal calendario, conferma entro le 17:00, ingressi singoli, email
+- [x] **Fase 2** – lezioni generate dal calendario, conferma entro le 17:00, ingressi singoli, dashboard
+- [ ] **Fase 2b** – promemoria via email
 - [ ] **Fase 3** – prenotazione corsie
 - [ ] **Fase 4** – WhatsApp, report, rifiniture grafiche

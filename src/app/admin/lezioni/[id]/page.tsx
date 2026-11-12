@@ -1,0 +1,183 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { BarraPosti } from "@/components/BarraPosti";
+import { Avviso, Card, Titolo, bottone, bottoneSecondario, campo, etichetta, parametro, type SearchParams } from "@/components/ui";
+import { richiediStaff } from "@/lib/sessione";
+import { etichettaGiorno, oraDi } from "@/lib/formato";
+import { contaPosti, type StatoPrenotazione, type TipoPrenotazione } from "@/lib/posti";
+import { aggiungiIngresso, confermaPerConto, liberaPosto } from "../actions";
+
+type Prenotazione = {
+  id: string;
+  stato: StatoPrenotazione;
+  tipo: TipoPrenotazione;
+  nome_ospite: string | null;
+  confermata_il: string | null;
+  profili: { nome: string; cognome: string; telefono: string | null; email: string | null } | null;
+};
+
+type Lezione = {
+  id: string;
+  inizio: string;
+  fine: string;
+  capienza: number;
+  scadenza_conferma: string;
+  annullata: boolean;
+  corsi: { nome: string } | null;
+  prenotazioni: Prenotazione[];
+};
+
+function nomeDi(p: Prenotazione) {
+  if (p.profili) return `${p.profili.cognome} ${p.profili.nome}`.trim();
+  return p.nome_ospite ? `${p.nome_ospite} (ospite)` : "—";
+}
+
+export default async function LezionePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: SearchParams;
+}) {
+  const { supabase } = await richiediStaff();
+  const { id } = await params;
+  const sp = await searchParams;
+
+  const [lezioneRes, utentiRes] = await Promise.all([
+    supabase
+      .from("lezioni")
+      .select(
+        "id, inizio, fine, capienza, scadenza_conferma, annullata, corsi(nome), prenotazioni(id, stato, tipo, nome_ospite, confermata_il, profili(nome, cognome, telefono, email))",
+      )
+      .eq("id", id)
+      .maybeSingle(),
+    supabase.from("profili").select("id, nome, cognome").eq("attivo", true).order("cognome"),
+  ]);
+
+  const lezione = lezioneRes.data as unknown as Lezione | null;
+  if (!lezione) notFound();
+  const utenti = (utentiRes.data ?? []) as unknown as { id: string; nome: string; cognome: string }[];
+
+  const adesso = new Date();
+  const iniziata = new Date(lezione.inizio) <= adesso;
+  const confermeChiuse = new Date(lezione.scadenza_conferma) <= adesso;
+  const c = contaPosti(lezione.capienza, lezione.prenotazioni);
+  const ordina = (a: Prenotazione, b: Prenotazione) => nomeDi(a).localeCompare(nomeDi(b));
+
+  const gruppi = [
+    {
+      titolo: "Da confermare",
+      nota: confermeChiuse ? "Le conferme sono chiuse: tra pochi istanti questi posti verranno liberati." : `Entro le ${oraDi(lezione.scadenza_conferma)}`,
+      righe: lezione.prenotazioni.filter((p) => p.stato === "riservata").sort(ordina),
+    },
+    {
+      titolo: "Abbonati confermati",
+      righe: lezione.prenotazioni.filter((p) => p.stato === "confermata" && p.tipo === "abbonamento").sort(ordina),
+    },
+    {
+      titolo: "Ingressi singoli",
+      righe: lezione.prenotazioni.filter((p) => p.stato === "confermata" && p.tipo === "ingresso_singolo").sort(ordina),
+    },
+    {
+      titolo: "Posti liberati",
+      nota: "Abbonati che non hanno confermato o hanno disdetto",
+      righe: lezione.prenotazioni.filter((p) => p.stato === "liberata").sort(ordina),
+    },
+  ];
+
+  return (
+    <>
+      <Titolo azione={<Link href="/admin" className={bottoneSecondario}>← Panoramica</Link>}>
+        {lezione.corsi?.nome} · {etichettaGiorno(lezione.inizio)} alle {oraDi(lezione.inizio)}
+      </Titolo>
+      <Avviso errore={parametro(sp.errore)} ok={parametro(sp.ok)} />
+
+      <Card className="mb-6">
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <p className="text-lg font-semibold">
+            {lezione.capienza - c.liberi} / {lezione.capienza} posti occupati
+          </p>
+          <p className="text-sm text-slate-600">
+            {lezione.annullata ? "Lezione annullata" : iniziata ? "Lezione iniziata" : `${c.liberi} posti prenotabili`}
+          </p>
+        </div>
+        <BarraPosti conteggio={c} legenda />
+      </Card>
+
+      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+        <div className="space-y-6">
+          {gruppi.map((g) => (
+            <section key={g.titolo}>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                {g.titolo} <span className="text-abisso">({g.righe.length})</span>
+              </h2>
+              {g.nota && <p className="mb-2 text-xs text-slate-500">{g.nota}</p>}
+              {g.righe.length === 0 ? (
+                <p className="mt-2 text-sm text-slate-400">Nessuno.</p>
+              ) : (
+                <ul className="mt-2 divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
+                  {g.righe.map((p) => (
+                    <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
+                      <span>
+                        <span className="font-medium">{nomeDi(p)}</span>
+                        {p.profili?.telefono && <span className="ml-2 text-slate-500">{p.profili.telefono}</span>}
+                      </span>
+                      {!iniziata && (p.stato === "riservata" || p.stato === "confermata") && (
+                        <span className="flex gap-2">
+                          {p.stato === "riservata" && !confermeChiuse && (
+                            <form action={confermaPerConto}>
+                              <input type="hidden" name="id" value={p.id} />
+                              <input type="hidden" name="lezione_id" value={lezione.id} />
+                              <button className={bottoneSecondario}>Conferma</button>
+                            </form>
+                          )}
+                          <form action={liberaPosto}>
+                            <input type="hidden" name="id" value={p.id} />
+                            <input type="hidden" name="lezione_id" value={lezione.id} />
+                            <input type="hidden" name="tipo" value={p.tipo} />
+                            <button className={bottoneSecondario}>{p.tipo === "abbonamento" ? "Libera posto" : "Annulla"}</button>
+                          </form>
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          ))}
+        </div>
+
+        {!iniziata && !lezione.annullata && (
+          <Card className="h-fit">
+            <h2 className="mb-1 font-semibold">Aggiungi ingresso singolo</h2>
+            <p className="mb-4 text-xs text-slate-500">
+              Per chi telefona o si presenta in reception. {c.liberi === 0 && "Ora non ci sono posti liberi."}
+            </p>
+            <form action={aggiungiIngresso} className="space-y-3">
+              <input type="hidden" name="lezione_id" value={lezione.id} />
+              <div>
+                <label className={etichetta} htmlFor="utente_id">Cliente registrato</label>
+                <select id="utente_id" name="utente_id" className={campo} defaultValue="">
+                  <option value="">— nessuno —</option>
+                  {utenti.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.cognome} {u.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="text-center text-xs text-slate-400">oppure</p>
+              <div>
+                <label className={etichetta} htmlFor="nome_ospite">Nome e cognome (senza account)</label>
+                <input id="nome_ospite" name="nome_ospite" placeholder="Es. Anna Bianchi" className={campo} />
+              </div>
+              <button className={`${bottone} w-full`} disabled={c.liberi === 0}>
+                Aggiungi
+              </button>
+            </form>
+          </Card>
+        )}
+      </div>
+    </>
+  );
+}
