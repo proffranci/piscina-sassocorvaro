@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export type Voce = { href: string; testo: string; icona: "casa" | "persone" | "tessera" | "calendario" };
+export type Voce = {
+  href: string;
+  testo: string;
+  icona: "casa" | "persone" | "tessera" | "calendario" | "campana" | "utente" | "piu";
+  numero?: number; // pallino rosso (es. avvisi non letti)
+  soloComputer?: boolean; // sul telefono non sta nella barra in basso
+};
 
 // Icone disegnate a mano (SVG): nessuna libreria esterna, funzionano ovunque
 function Icona({ nome }: { nome: Voce["icona"] }) {
@@ -48,11 +54,43 @@ function Icona({ nome }: { nome: Voce["icona"] }) {
           <path d="M3 10h18M8 3v4M16 3v4" />
         </svg>
       );
+    case "campana":
+      return (
+        <svg {...comune}>
+          <path d="M6 16V11a6 6 0 1112 0v5l1.5 2h-15L6 16z" />
+          <path d="M10 20.5a2.2 2.2 0 004 0" />
+        </svg>
+      );
+    case "utente":
+      return (
+        <svg {...comune}>
+          <circle cx="12" cy="8" r="3.6" />
+          <path d="M4.5 20.5c0-4 3.4-7 7.5-7s7.5 3 7.5 7" />
+        </svg>
+      );
+    case "piu":
+      return (
+        <svg {...comune}>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 8v8M8 12h8" />
+        </svg>
+      );
   }
 }
 
+// Le pagine "principali" (/admin, /area) sono attive solo esattamente lì,
+// le altre anche nelle loro sottopagine (es. /admin/lezioni/123)
 function attiva(percorso: string, href: string) {
-  return href === "/admin" ? percorso === "/admin" || percorso.startsWith("/admin/lezioni") : percorso.startsWith(href);
+  return href === "/admin" || href === "/area" ? percorso === href : percorso === href || percorso.startsWith(href + "/");
+}
+
+function Pallino({ numero }: { numero?: number }) {
+  if (!numero) return null;
+  return (
+    <span className="absolute -right-2 -top-1 min-w-[18px] rounded-full bg-red-600 px-1 text-center text-[10px] font-bold leading-[18px] text-white">
+      {numero > 9 ? "9+" : numero}
+    </span>
+  );
 }
 
 // Sul computer: le voci sotto l'intestazione
@@ -68,7 +106,10 @@ export function NavAlta({ voci }: { voci: Voce[] }) {
             attiva(percorso, v.href) ? "bg-white/15 text-white" : "text-white/75"
           }`}
         >
-          {v.testo}
+          <span className="relative">
+            {v.testo}
+            <Pallino numero={v.numero} />
+          </span>
         </Link>
       ))}
     </nav>
@@ -76,8 +117,9 @@ export function NavAlta({ voci }: { voci: Voce[] }) {
 }
 
 // Sul telefono: la barra fissa in basso, comoda da usare con il pollice
-export function NavBassa({ voci }: { voci: Voce[] }) {
+export function NavBassa({ voci: tutte }: { voci: Voce[] }) {
   const percorso = usePathname() ?? "";
+  const voci = tutte.filter((v) => !v.soloComputer);
   return (
     <nav className="spazio-sotto fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 shadow-[0_-4px_16px_rgba(11,46,69,0.08)] backdrop-blur md:hidden">
       <ul className="mx-auto grid max-w-md" style={{ gridTemplateColumns: `repeat(${voci.length}, minmax(0, 1fr))` }}>
@@ -92,7 +134,10 @@ export function NavBassa({ voci }: { voci: Voce[] }) {
                 }`}
                 aria-current={on ? "page" : undefined}
               >
-                <Icona nome={v.icona} />
+                <span className="relative">
+                  <Icona nome={v.icona} />
+                  <Pallino numero={v.numero} />
+                </span>
                 {v.testo}
               </Link>
             </li>

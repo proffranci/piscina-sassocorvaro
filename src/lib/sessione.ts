@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { creaClientServer } from "@/lib/supabase/server";
 
@@ -18,18 +19,21 @@ export type Profilo = {
 };
 
 // Chi e l'utente loggato? Restituisce null se nessuno e entrato.
-export async function getSessione() {
+// cache(): nella stessa pagina il layout e la pagina chiedono la sessione
+// entrambi, ma al database andiamo una volta sola.
+// getClaims() verifica il "pass" di accesso direttamente qui, senza chiedere
+// ogni volta a Supabase: una chiamata di rete in meno a ogni pagina.
+export const getSessione = cache(async () => {
   const supabase = await creaClientServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+  const { data: datiAccesso } = await supabase.auth.getClaims();
+  const idUtente = datiAccesso?.claims?.sub as string | undefined;
+  if (!idUtente) return null;
 
-  const { data } = await supabase.from("profili").select("*").eq("id", user.id).single();
+  const { data } = await supabase.from("profili").select("*").eq("id", idUtente).single();
   const profilo = (data ?? null) as unknown as Profilo | null;
 
-  return { supabase, user, profilo };
-}
+  return { supabase, idUtente, profilo };
+});
 
 export function isStaff(profilo: Profilo | null) {
   return !!profilo && profilo.attivo && (profilo.ruolo === "staff" || profilo.ruolo === "admin");

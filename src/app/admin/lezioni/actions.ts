@@ -13,9 +13,9 @@ function esito(percorso: string, tipo: "ok" | "errore", messaggio: string): neve
 export async function generaCalendario() {
   const { supabase } = await richiediStaff();
   const { data, error } = await supabase.rpc("genera_lezioni", { p_giorni: 28 });
-  if (error) esito("/admin", "errore", messaggioDb(error, "Non sono riuscito ad aggiornare il calendario."));
+  if (error) esito("/admin/lezioni", "errore", messaggioDb(error, "Non sono riuscito ad aggiornare il calendario."));
   const nuove = Number(data ?? 0);
-  esito("/admin", "ok", nuove > 0 ? `Calendario aggiornato: ${nuove} lezioni aggiunte.` : "Il calendario era già aggiornato.");
+  esito("/admin/lezioni", "ok", nuove > 0 ? `Calendario aggiornato: ${nuove} lezioni aggiunte.` : "Il calendario era già aggiornato.");
 }
 
 // La reception conferma al posto dell'abbonato (es. ha telefonato)

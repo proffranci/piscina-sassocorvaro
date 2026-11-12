@@ -26,9 +26,10 @@ export async function aggiornaSessione(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims verifica il "pass" senza una chiamata di rete a ogni pagina
+  // (e se sta per scadere lo rinnova, aggiornando i cookie qui sopra)
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims?.sub;
 
   const percorso = request.nextUrl.pathname;
   const protetta = percorso.startsWith("/admin") || percorso.startsWith("/area");

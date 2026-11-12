@@ -3,6 +3,7 @@ import { Avviso, Badge, Card, Titolo, bottone, bottoneSecondario, parametro, typ
 import { richiediStaff } from "@/lib/sessione";
 import { data as formattaData, nomeGiorno, ora } from "@/lib/formato";
 import { cambiaPagato } from "./actions";
+import { sollecitaPagamento } from "../avvisi/actions";
 import { BottoneInvio } from "@/components/BottoneInvio";
 
 type Riga = {
@@ -92,11 +93,20 @@ export default async function AbbonamentiPage({ searchParams }: { searchParams: 
 
               {a.note && <p className="mt-3 text-sm italic text-slate-600">{a.note}</p>}
 
-              <form action={cambiaPagato} className="mt-4">
-                <input type="hidden" name="id" value={a.id} />
-                <input type="hidden" name="pagato" value={a.pagato ? "no" : "si"} />
-                <BottoneInvio className={bottoneSecondario}>{a.pagato ? "Segna come non pagato" : "Segna come pagato"}</BottoneInvio>
-              </form>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <form action={cambiaPagato}>
+                  <input type="hidden" name="id" value={a.id} />
+                  <input type="hidden" name="pagato" value={a.pagato ? "no" : "si"} />
+                  <BottoneInvio className={bottoneSecondario}>{a.pagato ? "Segna come non pagato" : "Segna come pagato"}</BottoneInvio>
+                </form>
+                {!a.pagato && !scaduto && (
+                  <form action={sollecitaPagamento}>
+                    <input type="hidden" name="abbonamento_id" value={a.id} />
+                    <input type="hidden" name="torna" value="/admin/abbonamenti" />
+                    <BottoneInvio className={bottoneSecondario}>🔔 Sollecita pagamento</BottoneInvio>
+                  </form>
+                )}
+              </div>
             </Card>
           );
         })}

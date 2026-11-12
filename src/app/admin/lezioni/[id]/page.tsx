@@ -61,7 +61,7 @@ export default async function LezionePage({
     console.error("[lezione] errore nel caricamento:", lezioneRes.error);
     return (
       <>
-        <Titolo azione={<Link href="/admin" className={bottoneSecondario}>← Panoramica</Link>}>Lezione</Titolo>
+        <Titolo azione={<Link href="/admin/lezioni" className={bottoneSecondario}>← Lezioni</Link>}>Lezione</Titolo>
         <Avviso
           errore={`Non riesco a caricare la lezione. Dettaglio tecnico: ${lezioneRes.error.message} (${lezioneRes.error.code ?? "?"})`}
         />
@@ -102,7 +102,7 @@ export default async function LezionePage({
 
   return (
     <>
-      <Titolo azione={<Link href="/admin" className={bottoneSecondario}>← Panoramica</Link>}>
+      <Titolo azione={<Link href="/admin/lezioni" className={bottoneSecondario}>← Lezioni</Link>}>
         {lezione.corsi?.nome} · {etichettaGiorno(lezione.inizio)} alle {oraDi(lezione.inizio)}
       </Titolo>
       <Avviso errore={parametro(sp.errore)} ok={parametro(sp.ok)} />
