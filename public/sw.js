@@ -23,6 +23,8 @@ self.addEventListener("push", (event) => {
       icon: "/icona-192.png",
       badge: "/icona-192.png",
       tag: dati.tag || undefined,
+      // stessa "etichetta" = una notifica sola aggiornata, ma che suona di nuovo
+      renotify: Boolean(dati.tag),
       data: { url: dati.url || "/area/avvisi" },
     }),
   );
@@ -32,7 +34,9 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const percorso = (event.notification.data && event.notification.data.url) || "/area/avvisi";
-  const url = new URL(percorso, self.location.origin).href;
+  // Solo pagine della nostra app (mai indirizzi esterni)
+  const interno = percorso.startsWith("/") && !percorso.startsWith("//");
+  const url = new URL(interno ? percorso : "/area/avvisi", self.location.origin).href;
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((finestre) => {

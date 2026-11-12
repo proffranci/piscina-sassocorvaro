@@ -36,6 +36,8 @@ const ICONE: Record<string, string> = {
   pagamento: "💶",
   abbonamento: "🪪",
   avviso: "🔔",
+  ripreso: "🔁",
+  preferenza: "👤",
 };
 
 function nome(a: Abb) {

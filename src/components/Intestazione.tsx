@@ -2,8 +2,19 @@ import Link from "next/link";
 import { Logo } from "@/components/ui";
 import { BottoneInvio } from "@/components/BottoneInvio";
 import { NavAlta, NavBassa, type Voce } from "@/components/Navigazione";
+import { Campanella } from "@/components/Campanella";
 
-export function Intestazione({ voci, nome, ruolo }: { voci: Voce[]; nome: string; ruolo: string }) {
+export function Intestazione({
+  voci,
+  nome,
+  ruolo,
+  novita,
+}: {
+  voci: Voce[];
+  nome: string;
+  ruolo: string;
+  novita?: number; // solo per lo staff: la campanella con il numerino
+}) {
   return (
     <>
       <header className="righe-corsia spazio-sopra sticky top-0 z-20 bg-abisso text-white md:static">
@@ -16,6 +27,7 @@ export function Intestazione({ voci, nome, ruolo }: { voci: Voce[]; nome: string
             <span className="hidden text-white/80 sm:inline">
               {nome} <span className="rounded bg-white/10 px-1.5 py-0.5 text-xs uppercase">{ruolo}</span>
             </span>
+            {novita !== undefined && <Campanella numeroIniziale={novita} />}
             <form action="/esci" method="post">
               <BottoneInvio className="min-h-[40px] rounded-lg border border-white/20 px-3 py-1.5 hover:bg-white/10">
                 Esci
