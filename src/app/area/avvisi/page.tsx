@@ -1,3 +1,4 @@
+import { AttivaNotifiche } from "@/components/AttivaNotifiche";
 import { Card } from "@/components/ui";
 import { richiediUtente } from "@/lib/sessione";
 import { etichettaGiorno, oraDi } from "@/lib/formato";
@@ -42,6 +43,7 @@ export default async function AvvisiCliente() {
     <>
       <SegnaLette attivo={nonLetti > 0} />
       <h1 className="mb-5 text-2xl font-bold">Avvisi</h1>
+      <AttivaNotifiche chiavePubblica={process.env.VAPID_PUBLIC_KEY?.trim() || null} />
 
       {avvisi.length === 0 ? (
         <Card>
