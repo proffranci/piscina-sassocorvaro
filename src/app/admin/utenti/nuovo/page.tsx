@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Avviso, Card, Titolo, bottone, bottoneSecondario, campo, etichetta, parametro, type SearchParams } from "@/components/ui";
 import { richiediStaff } from "@/lib/sessione";
 import { creaUtente } from "../actions";
+import { BottoneInvio } from "@/components/BottoneInvio";
 
 export default async function NuovoUtentePage({ searchParams }: { searchParams: SearchParams }) {
   const { profilo } = await richiediStaff();
@@ -56,7 +57,7 @@ export default async function NuovoUtentePage({ searchParams }: { searchParams: 
             <span>Il cliente acconsente a ricevere promemoria su WhatsApp</span>
           </label>
           <div className="sm:col-span-2">
-            <button className={bottone}>Crea utente</button>
+            <BottoneInvio className={bottone}>Crea utente</BottoneInvio>
           </div>
         </form>
       </Card>

@@ -3,6 +3,7 @@ import { Avviso, Badge, Card, Titolo, bottone, bottoneSecondario, parametro, typ
 import { richiediStaff } from "@/lib/sessione";
 import { data as formattaData, nomeGiorno, ora } from "@/lib/formato";
 import { cambiaPagato } from "./actions";
+import { BottoneInvio } from "@/components/BottoneInvio";
 
 type Riga = {
   id: string;
@@ -94,7 +95,7 @@ export default async function AbbonamentiPage({ searchParams }: { searchParams: 
               <form action={cambiaPagato} className="mt-4">
                 <input type="hidden" name="id" value={a.id} />
                 <input type="hidden" name="pagato" value={a.pagato ? "no" : "si"} />
-                <button className={bottoneSecondario}>{a.pagato ? "Segna come non pagato" : "Segna come pagato"}</button>
+                <BottoneInvio className={bottoneSecondario}>{a.pagato ? "Segna come non pagato" : "Segna come pagato"}</BottoneInvio>
               </form>
             </Card>
           );

@@ -5,6 +5,7 @@ import { richiediStaff } from "@/lib/sessione";
 import { etichettaGiorno, giornoChiave, oraDi } from "@/lib/formato";
 import { contaPosti, type StatoPrenotazione, type TipoPrenotazione } from "@/lib/posti";
 import { generaCalendario } from "./lezioni/actions";
+import { BottoneInvio } from "@/components/BottoneInvio";
 
 type Lezione = {
   id: string;
@@ -61,9 +62,9 @@ export default async function AdminHome({ searchParams }: { searchParams: Search
       <Titolo
         azione={
           <form action={generaCalendario}>
-            <button className={bottoneSecondario} title="Crea subito le lezioni mancanti delle prossime 4 settimane">
+            <BottoneInvio className={bottoneSecondario} title="Crea subito le lezioni mancanti delle prossime 4 settimane">
               ↻ Aggiorna calendario
-            </button>
+            </BottoneInvio>
           </form>
         }
       >

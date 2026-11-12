@@ -3,6 +3,7 @@ import { Avviso, Card, Titolo, bottone, bottoneSecondario, campo, etichetta, par
 import { richiediStaff } from "@/lib/sessione";
 import { nomeGiorno, ora } from "@/lib/formato";
 import { creaAbbonamento } from "../actions";
+import { BottoneInvio } from "@/components/BottoneInvio";
 
 type Utente = { id: string; nome: string; cognome: string; email: string | null };
 type Orario = { id: string; giorno_settimana: number; ora_inizio: string; corsi: { nome: string } | null };
@@ -95,7 +96,7 @@ export default async function NuovoAbbonamentoPage({ searchParams }: { searchPar
               Già pagato
             </label>
             <div className="sm:col-span-2">
-              <button className={bottone}>Crea abbonamento</button>
+              <BottoneInvio className={bottone}>Crea abbonamento</BottoneInvio>
             </div>
           </form>
         </Card>

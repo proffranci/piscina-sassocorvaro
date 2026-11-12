@@ -5,6 +5,7 @@ import { isStaff, richiediUtente } from "@/lib/sessione";
 import { data as formattaData, etichettaGiorno, nomeGiorno, ora, oraDi } from "@/lib/formato";
 import type { StatoPrenotazione, TipoPrenotazione } from "@/lib/posti";
 import { conferma, disdici, prenota } from "./actions";
+import { BottoneInvio } from "@/components/BottoneInvio";
 
 type LezioneBase = {
   id: string;
@@ -84,7 +85,7 @@ export default async function AreaPage({ searchParams }: { searchParams: SearchP
   return (
     <>
       <Intestazione voci={[]} nome={`${profilo.nome} ${profilo.cognome}`.trim()} ruolo={profilo.ruolo} />
-      <main className="mx-auto max-w-3xl px-4 py-8">
+      <main className="mx-auto max-w-3xl px-4 pb-12 pt-6 sm:py-8">
         <h1 className="text-2xl font-bold">Ciao {profilo.nome || "!"} 👋</h1>
         <p className="mb-6 text-slate-600">
           {daConfermare.length > 0
@@ -141,14 +142,14 @@ export default async function AreaPage({ searchParams }: { searchParams: SearchP
                               {etichettaGiorno(l.scadenza_conferma) === "Oggi" ? " di oggi" : ` di ${etichettaGiorno(l.scadenza_conferma).toLowerCase()}`}
                               , altrimenti il posto passa a chi fa l&apos;ingresso singolo.
                             </p>
-                            <div className="mt-4 flex flex-wrap gap-2">
+                            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                               <form action={conferma}>
                                 <input type="hidden" name="id" value={m.id} />
-                                <button className={bottone}>✓ Confermo la presenza</button>
+                                <BottoneInvio className={`${bottone} w-full sm:w-auto`}>✓ Confermo la presenza</BottoneInvio>
                               </form>
                               <form action={disdici}>
                                 <input type="hidden" name="id" value={m.id} />
-                                <button className={bottoneSecondario}>Non vengo</button>
+                                <BottoneInvio className={`${bottoneSecondario} w-full sm:w-auto`}>Non vengo</BottoneInvio>
                               </form>
                             </div>
                           </>
@@ -169,7 +170,7 @@ export default async function AreaPage({ searchParams }: { searchParams: SearchP
                           </div>
                           <form action={disdici}>
                             <input type="hidden" name="id" value={m.id} />
-                            <button className={bottoneSecondario}>Disdici</button>
+                            <BottoneInvio className={bottoneSecondario}>Disdici</BottoneInvio>
                           </form>
                         </div>
                       </Card>
@@ -190,7 +191,7 @@ export default async function AreaPage({ searchParams }: { searchParams: SearchP
                         {liberi > 0 && (
                           <form action={prenota}>
                             <input type="hidden" name="lezione_id" value={l.id} />
-                            <button className={bottoneSecondario}>Riprendi il posto</button>
+                            <BottoneInvio className={bottoneSecondario}>Riprendi il posto</BottoneInvio>
                           </form>
                         )}
                       </div>
@@ -224,7 +225,7 @@ export default async function AreaPage({ searchParams }: { searchParams: SearchP
                       {liberi > 0 && (
                         <form action={prenota}>
                           <input type="hidden" name="lezione_id" value={l.id} />
-                          <button className={bottone}>Prenota</button>
+                          <BottoneInvio className={bottone}>Prenota</BottoneInvio>
                         </form>
                       )}
                     </li>
