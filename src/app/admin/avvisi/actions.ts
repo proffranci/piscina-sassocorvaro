@@ -114,3 +114,18 @@ export async function inviaAvviso(formData: FormData) {
   const n = Number(data ?? 0);
   esito(torna, "ok", n === 1 ? "Avviso inviato a 1 persona." : `Avviso inviato a ${n} persone.`);
 }
+
+// "Ricorda di confermare": promemoria nell'app (e push) a chi deve ancora confermare.
+// "tutte" = tutte le lezioni con scadenza nelle prossime 48 ore, altrimenti una sola prenotazione.
+export async function ricordaConferme(formData: FormData) {
+  const { supabase } = await richiediStaff();
+  const torna = testo(formData, "torna") || "/admin/avvisi";
+  const id = testo(formData, "prenotazione_id");
+  const { data, error } = await supabase.rpc("ricorda_conferme", {
+    p_prenotazioni: id && id !== "tutte" ? [id] : null,
+  });
+  if (error) esito(torna, "errore", messaggioDb(error, "Invio non riuscito."));
+  const n = Number(data ?? 0);
+  if (n === 0) esito(torna, "ok", "Promemoria già inviato nell'ultima ora: nessun nuovo invio.");
+  esito(torna, "ok", n === 1 ? "Promemoria inviato nell'app." : `Promemoria inviato nell'app a ${n} persone.`);
+}

@@ -12,7 +12,7 @@ export type Profilo = {
   cognome: string;
   telefono: string | null;
   ruolo: Ruolo;
-  canale_notifica: "email" | "whatsapp";
+  canale_notifica: "app" | "whatsapp" | "email";
   consenso_whatsapp: boolean;
   attivo: boolean;
   creato_il: string;

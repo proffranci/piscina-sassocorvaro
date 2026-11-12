@@ -155,6 +155,9 @@ export default async function OggiPage({ searchParams }: { searchParams: SearchP
               );
             })}
           </ul>
+          <Link href="/admin/avvisi" className={`${bottoneSecondario} mt-3 w-full`}>
+            🔔 Ricorda di confermare (app o WhatsApp)
+          </Link>
         </Controllo>
 
         {/* 2. Pagamenti */}

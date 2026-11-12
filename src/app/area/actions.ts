@@ -76,3 +76,15 @@ export async function notificaDiProva() {
   });
   return { inviate };
 }
+
+// Il cliente sceglie come preferisce essere avvisato (app o WhatsApp)
+export async function aggiornaPreferenze(formData: FormData) {
+  const { supabase } = await richiediUtente();
+  const { error } = await supabase.rpc("imposta_preferenze", {
+    p_canale: testo(formData, "canale_notifica") === "whatsapp" ? "whatsapp" : "app",
+    p_telefono: testo(formData, "telefono"),
+    p_consenso_whatsapp: formData.get("consenso_whatsapp") === "on",
+  });
+  if (error) esito("errore", messaggioDb(error, "Non sono riuscito a salvare la preferenza."), "/area/profilo");
+  esito("ok", "Preferenza salvata.", "/area/profilo");
+}

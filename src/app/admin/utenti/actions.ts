@@ -19,7 +19,7 @@ export async function creaUtente(formData: FormData) {
   const email = testo(formData, "email").toLowerCase();
   const telefono = testo(formData, "telefono") || null;
   const password = String(formData.get("password") ?? "");
-  const canale = testo(formData, "canale_notifica") === "whatsapp" ? "whatsapp" : "email";
+  const canale = testo(formData, "canale_notifica") === "whatsapp" ? "whatsapp" : "app";
   const consensoWhatsapp = formData.get("consenso_whatsapp") === "on";
   const ruoloRichiesto = testo(formData, "ruolo") as Ruolo;
 

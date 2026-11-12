@@ -37,13 +37,25 @@ export default async function NuovoUtentePage({ searchParams }: { searchParams: 
             <input id="password" name="password" type="text" minLength={8} required className={campo} autoComplete="off" />
             <p className="mt-1 text-xs text-slate-500">Almeno 8 caratteri. Consegnala al cliente: potrà cambiarla in seguito.</p>
           </div>
-          <div>
-            <label className={etichetta} htmlFor="canale_notifica">Avvisi via</label>
-            <select id="canale_notifica" name="canale_notifica" className={campo} defaultValue="email">
-              <option value="email">Email</option>
-              <option value="whatsapp">WhatsApp</option>
-            </select>
-          </div>
+          <fieldset className="sm:col-span-2">
+            <legend className={etichetta}>Come preferisce ricevere gli avvisi?</legend>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <label className="flex min-h-[44px] items-start gap-2 rounded-lg border border-slate-200 p-3 text-sm has-[:checked]:border-acqua has-[:checked]:bg-schiuma">
+                <input type="radio" name="canale_notifica" value="app" defaultChecked className="mt-1" />
+                <span>
+                  <strong>🔔 App</strong>
+                  <span className="block text-xs text-slate-500">Avvisi e notifiche sul telefono dall&apos;app della piscina</span>
+                </span>
+              </label>
+              <label className="flex min-h-[44px] items-start gap-2 rounded-lg border border-slate-200 p-3 text-sm has-[:checked]:border-acqua has-[:checked]:bg-schiuma">
+                <input type="radio" name="canale_notifica" value="whatsapp" className="mt-1" />
+                <span>
+                  <strong>💬 WhatsApp</strong>
+                  <span className="block text-xs text-slate-500">Lo staff scrive su WhatsApp (servono telefono e consenso)</span>
+                </span>
+              </label>
+            </div>
+          </fieldset>
           <div>
             <label className={etichetta} htmlFor="ruolo">Ruolo</label>
             <select id="ruolo" name="ruolo" className={campo} defaultValue="utente">
