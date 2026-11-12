@@ -1,16 +1,20 @@
+import { BottoneWhatsApp, testiWhatsApp } from "@/components/WhatsApp";
 import { BottoneInvio } from "@/components/BottoneInvio";
 import { Avviso, Badge, Card, Titolo, bottone, campo, etichetta, parametro, type SearchParams } from "@/components/ui";
 import { richiediStaff } from "@/lib/sessione";
 import { etichettaGiorno, oraDi } from "@/lib/formato";
 import { inviaAvviso } from "./actions";
+import { GeneraChiavi } from "./GeneraChiavi";
+import { pushConfigurate } from "@/lib/push";
 
 type Inviata = {
   id: string;
   titolo: string;
+  testo: string;
   tipo: string;
   creata_il: string;
   letta_il: string | null;
-  profili: { nome: string; cognome: string } | null;
+  profili: { nome: string; cognome: string; telefono: string | null } | null;
 };
 
 // Modelli pronti: un tocco e il testo è già scritto
@@ -36,7 +40,7 @@ const MODELLI: Record<string, { titolo: string; testo: string; tipo: string; des
 };
 
 export default async function AvvisiPage({ searchParams }: { searchParams: SearchParams }) {
-  const { supabase } = await richiediStaff();
+  const { supabase, profilo } = await richiediStaff();
   const sp = await searchParams;
   const modello = MODELLI[parametro(sp.modello) ?? ""] ?? { titolo: "", testo: "", tipo: "promemoria", destinatari: "tutti" };
 
@@ -44,10 +48,11 @@ export default async function AvvisiPage({ searchParams }: { searchParams: Searc
     supabase.from("profili").select("id, nome, cognome").eq("ruolo", "utente").eq("attivo", true).order("cognome"),
     supabase
       .from("notifiche")
-      .select("id, titolo, tipo, creata_il, letta_il, profili!notifiche_utente_id_fkey(nome, cognome)")
+      .select("id, titolo, testo, tipo, creata_il, letta_il, profili!notifiche_utente_id_fkey(nome, cognome, telefono)")
       .order("creata_il", { ascending: false })
       .limit(40),
   ]);
+  const pushOk = pushConfigurate() && Boolean(process.env.PUSH_SEGRETO);
   const clienti = (clientiRes.data ?? []) as unknown as { id: string; nome: string; cognome: string }[];
   const inviate = (inviateRes.data ?? []) as unknown as Inviata[];
 
@@ -56,6 +61,7 @@ export default async function AvvisiPage({ searchParams }: { searchParams: Searc
       <Titolo>Avvisi</Titolo>
       <p className="-mt-4 mb-6 max-w-2xl text-sm text-slate-600">
         Gli avvisi compaiono ai clienti nella sezione <strong>Avvisi</strong> dell&apos;app, con un pallino rosso finché non li leggono.
+        Accanto a ogni avviso inviato trovi il pulsante <strong>WhatsApp</strong> per mandare lo stesso messaggio anche lì.
         Ogni mattina il sistema manda anche da solo il promemoria &quot;conferma entro le 17&quot; e gli avvisi di scadenza abbonamento.
       </p>
       <Avviso errore={parametro(sp.errore)} ok={parametro(sp.ok)} />
@@ -121,6 +127,33 @@ export default async function AvvisiPage({ searchParams }: { searchParams: Searc
         </Card>
 
         <section>
+          {profilo.ruolo === "admin" && (
+            <Card className="mb-6">
+              <h2 className="mb-1 font-semibold">Notifiche sul telefono</h2>
+              {pushOk ? (
+                <p className="text-sm text-emerald-700">
+                  ✓ Configurate. Ogni avviso arriva anche come notifica a chi le ha attivate (Avvisi o Profilo nella sua app).
+                </p>
+              ) : (
+                <div className="space-y-3 text-sm text-slate-700">
+                  <p>Per attivarle servono 4 impostazioni su Vercel (Settings → Environment Variables):</p>
+                  <ol className="list-decimal space-y-1 pl-5">
+                    <li>
+                      <strong>VAPID_PUBLIC_KEY</strong> e <strong>VAPID_PRIVATE_KEY</strong>: generale qui sotto;
+                    </li>
+                    <li>
+                      <strong>VAPID_SUBJECT</strong>: <code>mailto:</code> seguito dalla tua email;
+                    </li>
+                    <li>
+                      <strong>PUSH_SEGRETO</strong>: il codice mostrato dallo script SQL 0006.
+                    </li>
+                  </ol>
+                  <p>Poi fai Redeploy.</p>
+                  <GeneraChiavi />
+                </div>
+              )}
+            </Card>
+          )}
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Inviati di recente</h2>
           {inviate.length === 0 ? (
             <p className="text-sm text-slate-500">Nessun avviso ancora.</p>
@@ -132,9 +165,16 @@ export default async function AvvisiPage({ searchParams }: { searchParams: Searc
                     <span className="font-medium">{n.titolo}</span>
                     {n.letta_il ? <Badge tono="ok">letto</Badge> : <Badge>non letto</Badge>}
                   </div>
-                  <p className="text-xs text-slate-500">
-                    {n.profili ? `${n.profili.cognome} ${n.profili.nome}` : "—"} · {etichettaGiorno(n.creata_il)} {oraDi(n.creata_il)}
-                  </p>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <p className="text-xs text-slate-500">
+                      {n.profili ? `${n.profili.cognome} ${n.profili.nome}` : "—"} · {etichettaGiorno(n.creata_il)} {oraDi(n.creata_il)}
+                    </p>
+                    <BottoneWhatsApp
+                      telefono={n.profili?.telefono}
+                      testo={testiWhatsApp.avviso(n.profili?.nome ?? "", n.titolo, n.testo)}
+                      etichetta=""
+                    />
+                  </div>
                 </li>
               ))}
             </ul>

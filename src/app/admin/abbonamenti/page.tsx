@@ -1,3 +1,4 @@
+import { BottoneWhatsApp, testiWhatsApp } from "@/components/WhatsApp";
 import Link from "next/link";
 import { Avviso, Badge, Card, Titolo, bottone, bottoneSecondario, parametro, type SearchParams } from "@/components/ui";
 import { richiediStaff } from "@/lib/sessione";
@@ -13,7 +14,7 @@ type Riga = {
   data_fine: string;
   pagato: boolean;
   note: string | null;
-  profili: { nome: string; cognome: string; email: string | null } | null;
+  profili: { nome: string; cognome: string; email: string | null; telefono: string | null } | null;
   abbonamenti_orari: {
     orari_corso: { giorno_settimana: number; ora_inizio: string; corsi: { nome: string } | null } | null;
   }[];
@@ -28,7 +29,7 @@ export default async function AbbonamentiPage({ searchParams }: { searchParams: 
   let query = supabase
     .from("abbonamenti")
     .select(
-      "id, tipo, data_inizio, data_fine, pagato, note, profili(nome, cognome, email), abbonamenti_orari(orari_corso(giorno_settimana, ora_inizio, corsi(nome)))",
+      "id, tipo, data_inizio, data_fine, pagato, note, profili(nome, cognome, email, telefono), abbonamenti_orari(orari_corso(giorno_settimana, ora_inizio, corsi(nome)))",
     )
     .order("data_fine", { ascending: true });
   if (!mostraScaduti) query = query.gte("data_fine", oggi);
@@ -105,6 +106,9 @@ export default async function AbbonamentiPage({ searchParams }: { searchParams: 
                     <input type="hidden" name="torna" value="/admin/abbonamenti" />
                     <BottoneInvio className={bottoneSecondario}>🔔 Sollecita pagamento</BottoneInvio>
                   </form>
+                )}
+                {!a.pagato && !scaduto && (
+                  <BottoneWhatsApp telefono={a.profili?.telefono} testo={testiWhatsApp.pagamento(a.profili?.nome ?? "", a.tipo)} />
                 )}
               </div>
             </Card>

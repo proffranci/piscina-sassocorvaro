@@ -1,3 +1,4 @@
+import { AttivaNotifiche } from "@/components/AttivaNotifiche";
 import { BottoneInvio } from "@/components/BottoneInvio";
 import { Badge, Card, bottoneSecondario } from "@/components/ui";
 import { richiediUtente } from "@/lib/sessione";
@@ -14,6 +15,7 @@ export default async function ProfiloPage() {
   return (
     <>
       <h1 className="mb-5 text-2xl font-bold">Il tuo profilo</h1>
+      <AttivaNotifiche chiavePubblica={process.env.VAPID_PUBLIC_KEY?.trim() || null} />
 
       <Card className="mb-8">
         <dl className="grid gap-3 text-sm sm:grid-cols-2">

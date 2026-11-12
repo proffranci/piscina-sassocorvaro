@@ -1,3 +1,4 @@
+import { BottoneWhatsApp } from "@/components/WhatsApp";
 import Link from "next/link";
 import { Avviso, Badge, Card, Titolo, bottone, bottoneSecondario, campo, parametro, type SearchParams } from "@/components/ui";
 import { richiediStaff, type Profilo } from "@/lib/sessione";
@@ -57,6 +58,11 @@ export default async function UtentiPage({ searchParams }: { searchParams: Searc
                 )}
                 <p className="text-slate-500">Avvisi via {u.canale_notifica === "whatsapp" ? "WhatsApp" : "email"}</p>
               </div>
+              {u.telefono && (
+                <div className="mt-3">
+                  <BottoneWhatsApp telefono={u.telefono} etichetta="Scrivi su WhatsApp" pieno />
+                </div>
+              )}
               {u.id !== io.id && (
                 <form action={cambiaAttivo} className="mt-3">
                   <input type="hidden" name="id" value={u.id} />

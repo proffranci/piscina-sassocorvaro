@@ -1,3 +1,4 @@
+import { BottoneWhatsApp, testiWhatsApp } from "@/components/WhatsApp";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BarraPosti } from "@/components/BarraPosti";
@@ -77,6 +78,7 @@ export default async function LezionePage({
   const iniziata = new Date(lezione.inizio) <= adesso;
   const confermeChiuse = new Date(lezione.scadenza_conferma) <= adesso;
   const c = contaPosti(lezione.capienza, lezione.prenotazioni);
+  const titoloLezione = `${lezione.corsi?.nome ?? "lezione"} ${etichettaGiorno(lezione.inizio).toLowerCase()} alle ${oraDi(lezione.inizio)}`;
   const ordina = (a: Prenotazione, b: Prenotazione) => nomeDi(a).localeCompare(nomeDi(b));
 
   const gruppi = [
@@ -141,6 +143,19 @@ export default async function LezionePage({
                           </a>
                         )}
                       </span>
+                      <span className="flex flex-wrap gap-2">
+                        {/* WhatsApp con il testo giusto: promemoria per chi deve confermare, messaggio libero per gli altri */}
+                        {!iniziata && (
+                          <BottoneWhatsApp
+                            telefono={p.profili?.telefono}
+                            etichetta=""
+                            testo={
+                              p.stato === "riservata" && !confermeChiuse
+                                ? testiWhatsApp.conferma(p.profili?.nome ?? "", titoloLezione, oraDi(lezione.scadenza_conferma))
+                                : testiWhatsApp.lezione(p.profili?.nome ?? "", titoloLezione)
+                            }
+                          />
+                        )}
                       {!iniziata && (p.stato === "riservata" || p.stato === "confermata") && (
                         <span className="flex gap-2">
                           {p.stato === "riservata" && !confermeChiuse && (
@@ -158,6 +173,7 @@ export default async function LezionePage({
                           </form>
                         </span>
                       )}
+                      </span>
                     </li>
                   ))}
                 </ul>

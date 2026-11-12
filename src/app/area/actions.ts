@@ -41,3 +41,38 @@ export async function segnaLette() {
   await supabase.rpc("segna_notifiche_lette");
   revalidatePath("/area", "layout");
 }
+
+// ---------- Notifiche push sul telefono ----------
+
+type DatiIscrizione = { endpoint: string; p256dh: string; auth: string; dispositivo: string };
+
+// Il telefono ha accettato le notifiche: salviamo il suo "indirizzo"
+export async function salvaIscrizione(dati: DatiIscrizione) {
+  const { supabase } = await richiediUtente();
+  const { error } = await supabase.rpc("salva_iscrizione_push", {
+    p_endpoint: dati.endpoint,
+    p_p256dh: dati.p256dh,
+    p_auth: dati.auth,
+    p_dispositivo: dati.dispositivo,
+  });
+  return { ok: !error, errore: error ? messaggioDb(error, "Non sono riuscito ad attivare le notifiche.") : null };
+}
+
+export async function rimuoviIscrizione(endpoint: string) {
+  const { supabase } = await richiediUtente();
+  await supabase.rpc("rimuovi_iscrizione_push", { p_endpoint: endpoint });
+  return { ok: true };
+}
+
+// "Mandami una prova": una notifica solo a sé stessi
+export async function notificaDiProva() {
+  const { profilo } = await richiediUtente();
+  const { inviaPush } = await import("@/lib/push");
+  const inviate = await inviaPush([profilo.id], {
+    titolo: "Notifiche attive 🏊",
+    testo: "Da ora riceverai qui i promemoria della piscina.",
+    url: "/area/avvisi",
+    tag: "prova",
+  });
+  return { inviate };
+}

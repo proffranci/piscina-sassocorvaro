@@ -1,3 +1,4 @@
+import { BottoneWhatsApp, testiWhatsApp } from "@/components/WhatsApp";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BottoneInvio } from "@/components/BottoneInvio";
@@ -165,11 +166,14 @@ export default async function OggiPage({ searchParams }: { searchParams: SearchP
                   <strong>{nome(a)}</strong>
                   <span className="block text-xs text-slate-500">{a.tipo}</span>
                 </span>
-                <form action={sollecitaPagamento}>
-                  <input type="hidden" name="abbonamento_id" value={a.id} />
-                  <input type="hidden" name="torna" value="/admin" />
-                  <BottoneInvio className={bottoneSecondario}>Sollecita</BottoneInvio>
-                </form>
+                <span className="flex shrink-0 gap-2">
+                  <BottoneWhatsApp telefono={a.profili?.telefono} testo={testiWhatsApp.pagamento(a.profili?.nome ?? "", a.tipo)} etichetta="" />
+                  <form action={sollecitaPagamento}>
+                    <input type="hidden" name="abbonamento_id" value={a.id} />
+                    <input type="hidden" name="torna" value="/admin" />
+                    <BottoneInvio className={bottoneSecondario}>Sollecita</BottoneInvio>
+                  </form>
+                </span>
               </li>
             ))}
           </ul>
@@ -193,11 +197,18 @@ export default async function OggiPage({ searchParams }: { searchParams: SearchP
                     scade {a.data_fine === oggiData ? "oggi" : `il ${formattaData(a.data_fine)}`}
                   </span>
                 </span>
-                <form action={avvisaScadenza}>
-                  <input type="hidden" name="abbonamento_id" value={a.id} />
-                  <input type="hidden" name="torna" value="/admin" />
-                  <BottoneInvio className={bottoneSecondario}>Avvisa</BottoneInvio>
-                </form>
+                <span className="flex shrink-0 gap-2">
+                  <BottoneWhatsApp
+                    telefono={a.profili?.telefono}
+                    testo={testiWhatsApp.scadenza(a.profili?.nome ?? "", a.tipo, formattaData(a.data_fine))}
+                    etichetta=""
+                  />
+                  <form action={avvisaScadenza}>
+                    <input type="hidden" name="abbonamento_id" value={a.id} />
+                    <input type="hidden" name="torna" value="/admin" />
+                    <BottoneInvio className={bottoneSecondario}>Avvisa</BottoneInvio>
+                  </form>
+                </span>
               </li>
             ))}
           </ul>
@@ -212,11 +223,14 @@ export default async function OggiPage({ searchParams }: { searchParams: SearchP
                   <strong>{nome(a)}</strong>
                   <span className="block text-xs text-slate-500">scaduto il {formattaData(a.data_fine)}</span>
                 </span>
-                {a.profili?.telefono && (
-                  <a href={`tel:${a.profili.telefono.replace(/\s/g, "")}`} className={bottoneSecondario}>
-                    📞 Chiama
-                  </a>
-                )}
+                <span className="flex shrink-0 gap-2">
+                  <BottoneWhatsApp telefono={a.profili?.telefono} testo={testiWhatsApp.scaduto(a.profili?.nome ?? "", a.tipo)} etichetta="" />
+                  {a.profili?.telefono && (
+                    <a href={`tel:${a.profili.telefono.replace(/\s/g, "")}`} className={bottoneSecondario}>
+                      📞 Chiama
+                    </a>
+                  )}
+                </span>
               </li>
             ))}
           </ul>
