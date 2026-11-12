@@ -1,0 +1,18 @@
+# dipendenze
+/node_modules
+
+# build di Next.js
+/.next/
+/out/
+/build
+next-env.d.ts
+*.tsbuildinfo
+
+# file segreti: le chiavi vere stanno solo su Vercel e sul tuo computer
+.env
+.env*.local
+
+# varie
+.DS_Store
+.vercel
+npm-debug.log*

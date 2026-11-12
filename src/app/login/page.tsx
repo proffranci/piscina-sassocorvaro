@@ -1,0 +1,55 @@
+import { accedi } from "./actions";
+import { Avviso, Logo, bottone, campo, etichetta, parametro, type SearchParams } from "@/components/ui";
+
+const MESSAGGI: Record<string, string> = {
+  credenziali: "Email o password non corrette.",
+  campi: "Inserisci email e password.",
+};
+
+export default async function LoginPage({ searchParams }: { searchParams: SearchParams }) {
+  const params = await searchParams;
+  const errore = MESSAGGI[parametro(params.errore) ?? ""];
+
+  return (
+    <main className="grid min-h-dvh lg:grid-cols-2">
+      <section className="righe-corsia relative hidden flex-col justify-between bg-abisso p-10 text-white lg:flex">
+        <Logo chiaro />
+        <div>
+          <p className="text-4xl font-bold leading-tight">
+            Il tuo posto in vasca,
+            <br />
+            <span className="text-riflesso">sempre a portata di mano.</span>
+          </p>
+          <p className="mt-4 max-w-md text-white/70">
+            Conferma le lezioni di Hydrobike, prenota le corsie e tieni d&apos;occhio il tuo abbonamento.
+          </p>
+        </div>
+        <div className="h-2 w-40 rounded-full bg-corsia" />
+      </section>
+
+      <section className="flex items-center justify-center p-6">
+        <div className="w-full max-w-sm">
+          <div className="mb-8 lg:hidden">
+            <Logo />
+          </div>
+          <h1 className="mb-1 text-2xl font-bold">Accedi</h1>
+          <p className="mb-6 text-sm text-slate-600">Usa l&apos;email e la password ricevute in piscina.</p>
+
+          <Avviso errore={errore} />
+
+          <form action={accedi} className="space-y-4">
+            <div>
+              <label htmlFor="email" className={etichetta}>Email</label>
+              <input id="email" name="email" type="email" autoComplete="email" required className={campo} />
+            </div>
+            <div>
+              <label htmlFor="password" className={etichetta}>Password</label>
+              <input id="password" name="password" type="password" autoComplete="current-password" required className={campo} />
+            </div>
+            <button type="submit" className={`${bottone} w-full`}>Entra</button>
+          </form>
+        </div>
+      </section>
+    </main>
+  );
+}
