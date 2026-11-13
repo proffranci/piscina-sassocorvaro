@@ -20,7 +20,17 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 async function bersaglioGestibile(id: string, pagina: string) {
   const sessione = await richiediStaff();
   const admin = creaClientAdmin();
-  const { data } = await admin.from("profili").select("id, nome, cognome, ruolo, nome_utente, email").eq("id", id).maybeSingle();
+  const { data, error } = await admin.from("profili").select("id, nome, cognome, ruolo, nome_utente, email").eq("id", id).maybeSingle();
+  if (error) {
+    console.error("[utenti] lettura profilo fallita:", error);
+    // 42703 = colonna mancante: di solito uno script SQL non ancora eseguito
+    errore(
+      pagina,
+      error.code === "42703"
+        ? "Il database non è aggiornato: esegui in Supabase lo script 0009_account_e_cambi_giorno.sql."
+        : `Errore del database: ${error.message}`,
+    );
+  }
   const utente = data as { id: string; nome: string; cognome: string; ruolo: Ruolo; nome_utente: string | null; email: string | null } | null;
   if (!utente) errore("/admin/utenti", "Utente non trovato.");
   if (utente.id === sessione.profilo.id) errore(pagina, "Per il tuo account usa la pagina Profilo.");
