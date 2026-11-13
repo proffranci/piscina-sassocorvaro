@@ -126,9 +126,13 @@ export default async function LezioniCliente({ searchParams }: { searchParams: S
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <p className="font-semibold">{titolo}</p>
-                        <p className="mt-1 text-sm text-emerald-700">
-                          ✓ {m.tipo === "abbonamento" ? "Presenza confermata" : "Ingresso prenotato"}
-                        </p>
+                        {m.da_confermare_staff ? (
+                          <p className="mt-1 text-sm text-amber-800">⏳ Prenotato, in attesa di conferma della reception</p>
+                        ) : (
+                          <p className="mt-1 text-sm text-emerald-700">
+                            ✓ {m.tipo === "abbonamento" ? "Presenza confermata" : "Prenotazione confermata"}
+                          </p>
+                        )}
                       </div>
                       <form action={disdici}>
                         <input type="hidden" name="id" value={m.id} />

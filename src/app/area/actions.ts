@@ -31,7 +31,7 @@ export async function prenota(formData: FormData) {
   const { supabase } = await richiediUtente();
   const { error } = await supabase.rpc("prenota_ingresso", { p_lezione: testo(formData, "lezione_id") });
   if (error) esito("errore", messaggioDb(error, "Prenotazione non riuscita, riprova."), testo(formData, "torna") === "/area/prenota" ? "/area/prenota" : "/area");
-  esito("ok", "Prenotazione confermata! La trovi qui tra le tue lezioni.");
+  esito("ok", "Prenotazione inviata! Il posto è tuo: riceverai la conferma della reception tra gli Avvisi.");
 }
 
 // Chiamata in automatico quando il cliente apre la pagina Avvisi:

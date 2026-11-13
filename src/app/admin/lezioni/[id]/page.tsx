@@ -6,7 +6,7 @@ import { Avviso, Card, Titolo, bottone, bottoneSecondario, campo, etichetta, par
 import { richiediStaff } from "@/lib/sessione";
 import { etichettaGiorno, oraDi } from "@/lib/formato";
 import { contaPosti, type StatoPrenotazione, type TipoPrenotazione } from "@/lib/posti";
-import { aggiungiIngresso, confermaPerConto, liberaPosto } from "../actions";
+import { aggiungiIngresso, confermaIngresso, confermaPerConto, liberaPosto } from "../actions";
 import { BottoneInvio } from "@/components/BottoneInvio";
 
 type Prenotazione = {
@@ -14,6 +14,7 @@ type Prenotazione = {
   stato: StatoPrenotazione;
   tipo: TipoPrenotazione;
   nome_ospite: string | null;
+  da_confermare_staff: boolean;
   confermata_il: string | null;
   profili: { nome: string; cognome: string; telefono: string | null; email: string | null } | null;
 };
@@ -49,7 +50,7 @@ export default async function LezionePage({
     supabase
       .from("lezioni")
       .select(
-        "id, inizio, fine, capienza, scadenza_conferma, annullata, corsi(nome), prenotazioni(id, stato, tipo, nome_ospite, confermata_il, profili(nome, cognome, telefono, email))",
+        "id, inizio, fine, capienza, scadenza_conferma, annullata, corsi(nome), prenotazioni(id, stato, tipo, nome_ospite, confermata_il, da_confermare_staff, profili(nome, cognome, telefono, email))",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -93,7 +94,11 @@ export default async function LezionePage({
     },
     {
       titolo: "Ingressi singoli",
-      righe: lezione.prenotazioni.filter((p) => p.stato === "confermata" && p.tipo === "ingresso_singolo").sort(ordina),
+      nota: "Quelli \"da confermare\" aspettano la tua conferma: premendo Conferma il cliente riceve l'avviso",
+      // prima quelli da confermare
+      righe: lezione.prenotazioni
+        .filter((p) => p.stato === "confermata" && p.tipo === "ingresso_singolo")
+        .sort((a, b) => Number(b.da_confermare_staff) - Number(a.da_confermare_staff) || ordina(a, b)),
     },
     {
       titolo: "Posti liberati",
@@ -137,6 +142,11 @@ export default async function LezionePage({
                     <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
                       <span>
                         <span className="font-medium">{nomeDi(p)}</span>
+                        {p.da_confermare_staff && p.stato === "confermata" && (
+                          <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-amber-200">
+                            da confermare
+                          </span>
+                        )}
                         {p.profili?.telefono && (
                           <a href={`tel:${p.profili.telefono.replace(/\s/g, "")}`} className="ml-2 text-vasca underline">
                             {p.profili.telefono}
@@ -160,6 +170,13 @@ export default async function LezionePage({
                         )}
                       {!iniziata && (p.stato === "riservata" || p.stato === "confermata") && (
                         <span className="flex gap-2">
+                          {p.da_confermare_staff && p.stato === "confermata" && (
+                            <form action={confermaIngresso}>
+                              <input type="hidden" name="id" value={p.id} />
+                              <input type="hidden" name="lezione_id" value={lezione.id} />
+                              <BottoneInvio className={bottone}>✓ Conferma</BottoneInvio>
+                            </form>
+                          )}
                           {p.stato === "riservata" && !confermeChiuse && (
                             <form action={confermaPerConto}>
                               <input type="hidden" name="id" value={p.id} />
@@ -208,6 +225,13 @@ export default async function LezionePage({
                 <label className={etichetta} htmlFor="nome_ospite">Nome e cognome (senza account)</label>
                 <input id="nome_ospite" name="nome_ospite" placeholder="Es. Anna Bianchi" className={campo} />
               </div>
+              <label className="flex items-start gap-2 text-sm">
+                <input type="checkbox" name="conferma_subito" className="mt-1" />
+                <span>
+                  Invia subito la conferma
+                  <span className="block text-xs text-slate-500">Altrimenti la confermi dopo con il pulsante ✓ Conferma</span>
+                </span>
+              </label>
               <BottoneInvio className={`${bottone} w-full`} disabled={c.liberi === 0}>
                 Aggiungi
               </BottoneInvio>

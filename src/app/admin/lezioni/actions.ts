@@ -58,6 +58,10 @@ export async function aggiungiIngresso(formData: FormData) {
   const pagina = `/admin/lezioni/${lezione}`;
   const utenteId = testo(formData, "utente_id");
   const nomeOspite = testo(formData, "nome_ospite");
+  // Senza la spunta "Invia subito la conferma" l'ingresso resta in attesa:
+  // la conferma (e l'avviso al cliente) la dai tu dopo, con il pulsante Conferma
+  const confermaSubito = formData.get("conferma_subito") === "on";
+  const inAttesa = utenteId ? !confermaSubito : false; // gli ospiti senza account non hanno l'app
 
   if (!utenteId && !nomeOspite) esito(pagina, "errore", "Scegli un cliente oppure scrivi il nome della persona.");
 
@@ -80,7 +84,7 @@ export async function aggiungiIngresso(formData: FormData) {
     if (esistente) {
       const { error } = await supabase
         .from("prenotazioni")
-        .update({ stato: "confermata", confermata_il: adesso })
+        .update({ stato: "confermata", confermata_il: adesso, da_confermare_staff: inAttesa })
         .eq("id", esistente.id);
       if (error) esito(pagina, "errore", messaggioDb(error, "Prenotazione non riuscita."));
       esito(pagina, "ok", "Posto riassegnato.");
@@ -94,7 +98,30 @@ export async function aggiungiIngresso(formData: FormData) {
     tipo: "ingresso_singolo",
     stato: "confermata",
     confermata_il: adesso,
+    da_confermare_staff: inAttesa,
   });
   if (error) esito(pagina, "errore", messaggioDb(error, "Prenotazione non riuscita."));
-  esito(pagina, "ok", "Ingresso singolo aggiunto.");
+  esito(
+    pagina,
+    "ok",
+    inAttesa ? "Ingresso aggiunto: quando vuoi premi Conferma per avvisare il cliente." : "Ingresso aggiunto e confermato.",
+  );
+}
+
+// La reception conferma un ingresso singolo: il cliente riceve "Prenotazione confermata ✓"
+export async function confermaIngresso(formData: FormData) {
+  const { supabase } = await richiediStaff();
+  const lezione = testo(formData, "lezione_id");
+  const torna = testo(formData, "torna") === "/admin" ? "/admin" : `/admin/lezioni/${lezione}`;
+
+  const { data, error } = await supabase
+    .from("prenotazioni")
+    .update({ da_confermare_staff: false })
+    .eq("id", testo(formData, "id"))
+    .eq("da_confermare_staff", true)
+    .eq("stato", "confermata")
+    .select("id");
+  if (error) esito(torna, "errore", messaggioDb(error, "Conferma non riuscita."));
+  if (!data || data.length === 0) esito(torna, "errore", "Era già confermato.");
+  esito(torna, "ok", "Confermato: il cliente ha ricevuto l'avviso.");
 }
