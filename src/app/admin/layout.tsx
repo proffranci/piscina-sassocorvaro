@@ -13,11 +13,13 @@ const VOCI: Voce[] = [
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { profilo } = await richiediStaff();
+  const { supabase, profilo } = await richiediStaff();
+  // Il numerino della campanella: operazioni dei clienti non ancora viste
+  const { data: novita } = await supabase.rpc("conta_novita");
 
   return (
     <>
-      <Intestazione voci={VOCI} nome={`${profilo.nome} ${profilo.cognome}`.trim() || "Staff"} ruolo={profilo.ruolo} />
+      <Intestazione voci={VOCI} nome={`${profilo.nome} ${profilo.cognome}`.trim() || "Staff"} ruolo={profilo.ruolo} novita={Number(novita ?? 0)} />
       {/* pb-28 sul telefono: lascia spazio alla barra di navigazione in basso */}
       <main className="mx-auto max-w-6xl px-4 pb-28 pt-6 md:py-8">{children}</main>
     </>

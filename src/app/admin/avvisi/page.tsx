@@ -23,6 +23,18 @@ type InSospeso = {
   profili: { nome: string; cognome: string; telefono: string | null; canale_notifica: string } | null;
 };
 
+// Traduce la risposta tecnica in una frase che dice cosa fare
+function spiegaConsegna(codice: number | null, risposta: string | null, errore: string | null) {
+  if (codice === 200) {
+    const inviate = Number(/"inviate":(\d+)/.exec(risposta ?? "")?.[1] ?? 0);
+    return inviate > 0 ? `✅ consegnata (${inviate} ${inviate === 1 ? "dispositivo" : "dispositivi"})` : "⚠️ arrivata, ma il destinatario non ha telefoni iscritti";
+  }
+  if (codice === 401) return "❌ PUSH_SEGRETO su Vercel non coincide con quello del database: ricopialo e fai Redeploy";
+  if (codice === 404) return "❌ indirizzo sbagliato o codice non ancora pubblicato: controlla push_url e il deploy";
+  if (codice && codice >= 500) return "❌ errore dell'app su Vercel: guarda i Logs del progetto";
+  return `❌ nessuna risposta${errore ? ` (${errore})` : ""}: l'app è raggiungibile?`;
+}
+
 // Modelli pronti: un tocco e il testo è già scritto
 const MODELLI: Record<string, { titolo: string; testo: string; tipo: string; destinatari: string }> = {
   pagamento: {
@@ -74,6 +86,11 @@ export default async function AvvisiPage({ searchParams }: { searchParams: Searc
   );
   const suWhatsApp = inSospeso.filter((p) => p.profili?.canale_notifica === "whatsapp").length;
   const pushOk = pushConfigurate() && Boolean(process.env.PUSH_SEGRETO);
+  // Diagnosi: le ultime risposte di Vercel alle chiamate del database (solo admin)
+  const consegne =
+    profilo.ruolo === "admin"
+      ? (((await supabase.rpc("stato_push")).data ?? []) as { quando: string; codice: number | null; risposta: string | null; errore: string | null }[])
+      : [];
   const clienti = (clientiRes.data ?? []) as unknown as { id: string; nome: string; cognome: string }[];
   const inviate = (inviateRes.data ?? []) as unknown as Inviata[];
 
@@ -205,9 +222,26 @@ export default async function AvvisiPage({ searchParams }: { searchParams: Searc
             <Card className="mb-6">
               <h2 className="mb-1 font-semibold">Notifiche sul telefono</h2>
               {pushOk ? (
-                <p className="text-sm text-emerald-700">
-                  ✓ Configurate. Ogni avviso arriva anche come notifica a chi le ha attivate (Avvisi o Profilo nella sua app).
-                </p>
+                <>
+                  <p className="text-sm text-emerald-700">
+                    ✓ Configurate. Ogni avviso arriva anche come notifica a chi le ha attivate (Avvisi o Profilo nella sua app).
+                  </p>
+                  <h3 className="mb-1 mt-4 text-sm font-semibold">Ultime consegne</h3>
+                  {consegne.length === 0 ? (
+                    <p className="text-xs text-slate-500">
+                      Nessuna ancora: parte una consegna quando mandi un avviso a chi ha attivato le notifiche.
+                    </p>
+                  ) : (
+                    <ul className="space-y-1.5 text-xs">
+                      {consegne.map((c, i) => (
+                        <li key={i} className="rounded-lg bg-schiuma px-2.5 py-1.5">
+                          <span className="tabular-nums text-slate-500">{etichettaGiorno(c.quando)} {oraDi(c.quando)}</span> ·{" "}
+                          {spiegaConsegna(c.codice, c.risposta, c.errore)}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
               ) : (
                 <div className="space-y-3 text-sm text-slate-700">
                   <p>Per attivarle servono 4 impostazioni su Vercel (Settings → Environment Variables):</p>
