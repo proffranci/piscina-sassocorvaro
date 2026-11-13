@@ -42,6 +42,7 @@ src/app/area           area del cliente
 - [x] **Notifiche push** (Android, computer, iPhone con app installata) e **pulsanti WhatsApp** con testo pronto
 - [x] **Novità per lo staff** – campanella con numerino per ogni operazione dei clienti, push anche allo staff, diagnosi delle consegne
 - [x] **Account e cambi giorno** – nome utente unico, scheda utente, password temporanea, cambio password obbligatorio, richieste di cambio giorno
+- [x] **Corsi configurabili e Nuoto libero** – scadenza di conferma per corso/orario, orari in blocco, lezioni modificabili e annullabili, Nuoto libero con abbonamenti
 - [ ] **Email** – promemoria anche via email
 - [ ] **Fase 3** – prenotazione corsie
 - [ ] **Fase 4** – WhatsApp, report, rifiniture grafiche

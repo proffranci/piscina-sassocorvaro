@@ -7,7 +7,7 @@ import { richiediUtente } from "@/lib/sessione";
 import { data as formattaData, nomeGiorno, ora } from "@/lib/formato";
 import { SELECT_ABBONAMENTI, type Abbonamento } from "../dati";
 
-type Orario = { id: string; giorno_settimana: number; ora_inizio: string; corsi: { nome: string } | null };
+type Orario = { id: string; corso_id: string; giorno_settimana: number; ora_inizio: string; corsi: { nome: string } | null };
 type Richiesta = {
   id: string;
   abbonamento_id: string;
@@ -25,7 +25,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Sear
 
   const [abbRes, orariRes, richiesteRes] = await Promise.all([
     supabase.from("abbonamenti").select(SELECT_ABBONAMENTI).gte("data_fine", oggiData).order("data_inizio"),
-    supabase.from("orari_corso").select("id, giorno_settimana, ora_inizio, corsi(nome)").eq("attivo", true).order("giorno_settimana").order("ora_inizio"),
+    supabase.from("orari_corso").select("id, corso_id, giorno_settimana, ora_inizio, corsi(nome)").eq("attivo", true).order("giorno_settimana").order("ora_inizio"),
     supabase
       .from("richieste_cambio")
       .select("id, abbonamento_id, orario_vecchio_id, orario_nuovo_id, stato, risposta, creata_il")
@@ -150,7 +150,8 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Sear
         const miei = a.abbonamenti_orari.map((x) => x.orari_corso).filter((o): o is NonNullable<typeof o> => !!o);
         if (miei.length === 0) return null;
         const mieiId = new Set(miei.map((o) => o.id));
-        const alternative = orari.filter((o) => !mieiId.has(o.id));
+        // Solo orari dello stesso corso
+        const alternative = orari.filter((o) => o.corso_id === miei[0].corso_id && !mieiId.has(o.id));
         const inAttesa = richieste.find((r) => r.abbonamento_id === a.id && r.stato === "in_attesa");
         const ultima = richieste.find((r) => r.abbonamento_id === a.id && r.stato !== "in_attesa");
         return (

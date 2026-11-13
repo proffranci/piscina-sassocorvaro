@@ -8,7 +8,7 @@ import { richiediStaff } from "@/lib/sessione";
 import { data as formattaData, nomeGiorno, ora } from "@/lib/formato";
 import { cambiaGiorno, cambiaPagato } from "../actions";
 
-type Orario = { id: string; giorno_settimana: number; ora_inizio: string; corsi: { nome: string } | null };
+type Orario = { id: string; corso_id: string; giorno_settimana: number; ora_inizio: string; corsi: { nome: string } | null };
 type Abbonamento = {
   id: string;
   tipo: string;
@@ -36,11 +36,11 @@ export default async function SchedaAbbonamento({
     supabase
       .from("abbonamenti")
       .select(
-        "id, tipo, data_inizio, data_fine, pagato, note, utente_id, profili(nome, cognome, telefono), abbonamenti_orari(orari_corso(id, giorno_settimana, ora_inizio, corsi(nome)))",
+        "id, tipo, data_inizio, data_fine, pagato, note, utente_id, profili(nome, cognome, telefono), abbonamenti_orari(orari_corso(id, corso_id, giorno_settimana, ora_inizio, corsi(nome)))",
       )
       .eq("id", id)
       .maybeSingle(),
-    supabase.from("orari_corso").select("id, giorno_settimana, ora_inizio, corsi(nome)").eq("attivo", true).order("giorno_settimana").order("ora_inizio"),
+    supabase.from("orari_corso").select("id, corso_id, giorno_settimana, ora_inizio, corsi(nome)").eq("attivo", true).order("giorno_settimana").order("ora_inizio"),
     supabase.from("richieste_cambio").select(SELECT_RICHIESTE).eq("abbonamento_id", id).eq("stato", "in_attesa"),
   ]);
   const a = abbRes.data as unknown as Abbonamento | null;
@@ -53,7 +53,7 @@ export default async function SchedaAbbonamento({
     .filter((o): o is Orario => !!o)
     .sort((x, y) => x.giorno_settimana - y.giorno_settimana);
   const mieiId = new Set(miei.map((o) => o.id));
-  const alternative = orari.filter((o) => !mieiId.has(o.id));
+  const alternative = orari.filter((o) => o.corso_id === miei[0]?.corso_id && !mieiId.has(o.id));
   const scaduto = a.data_fine < new Date().toISOString().slice(0, 10);
   const pagina = `/admin/abbonamenti/${a.id}`;
 

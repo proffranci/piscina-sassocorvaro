@@ -2,7 +2,7 @@ import { BottoneWhatsApp, testiWhatsApp } from "@/components/WhatsApp";
 import { BottoneInvio } from "@/components/BottoneInvio";
 import { Avviso, Badge, Card, Titolo, bottone, bottoneSecondario, campo, etichetta, parametro, type SearchParams } from "@/components/ui";
 import { richiediStaff } from "@/lib/sessione";
-import { etichettaGiorno, oraDi } from "@/lib/formato";
+import { etichettaGiorno, oraDi, quando } from "@/lib/formato";
 import { inviaAvviso, ricordaConferme } from "./actions";
 import { GeneraChiavi } from "./GeneraChiavi";
 import { pushConfigurate } from "@/lib/push";
@@ -100,7 +100,7 @@ export default async function AvvisiPage({ searchParams }: { searchParams: Searc
       <p className="-mt-4 mb-6 max-w-2xl text-sm text-slate-600">
         Gli avvisi compaiono ai clienti nella sezione <strong>Avvisi</strong> dell&apos;app, con un pallino rosso finché non li leggono.
         Accanto a ogni avviso inviato trovi il pulsante <strong>WhatsApp</strong> per mandare lo stesso messaggio anche lì.
-        Ogni mattina il sistema manda anche da solo il promemoria &quot;conferma entro le 17&quot; e gli avvisi di scadenza abbonamento.
+        Ogni mattina il sistema manda anche da solo il promemoria per confermare entro la scadenza e gli avvisi di scadenza abbonamento.
       </p>
       <Avviso errore={parametro(sp.errore)} ok={parametro(sp.ok)} />
 
@@ -136,14 +136,14 @@ export default async function AvvisiPage({ searchParams }: { searchParams: Searc
                     <strong>{p.profili ? `${p.profili.cognome} ${p.profili.nome}` : "—"}</strong>{" "}
                     <span className="text-xs text-slate-500">· preferisce {preferisceWa ? "💬 WhatsApp" : "🔔 app"}</span>
                     <span className="block text-xs text-slate-500">
-                      {lezione} · entro le {oraDi(l.scadenza_conferma)}
+                      {lezione} · entro {quando(l.scadenza_conferma)}
                     </span>
                   </span>
                   <span className="flex shrink-0 gap-2">
                     <BottoneWhatsApp
                       telefono={p.profili?.telefono}
                       etichetta={preferisceWa ? "WhatsApp" : ""}
-                      testo={testiWhatsApp.conferma(p.profili?.nome ?? "", lezione, oraDi(l.scadenza_conferma))}
+                      testo={testiWhatsApp.conferma(p.profili?.nome ?? "", lezione, quando(l.scadenza_conferma))}
                     />
                     <form action={ricordaConferme}>
                       <input type="hidden" name="prenotazione_id" value={p.id} />
