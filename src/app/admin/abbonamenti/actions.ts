@@ -6,14 +6,16 @@ import { testo } from "@/lib/formato";
 import { messaggioDb } from "@/lib/errori";
 
 function errore(percorso: string, messaggio: string): never {
-  redirect(`${percorso}?errore=${encodeURIComponent(messaggio)}`);
+  const sep = percorso.includes("?") ? "&" : "?";
+  redirect(`${percorso}${sep}errore=${encodeURIComponent(messaggio)}`);
 }
 
 const DATA = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function creaAbbonamento(formData: FormData) {
   const { supabase } = await richiediStaff();
-  const pagina = "/admin/abbonamenti/nuovo";
+  const corsoId = testo(formData, "corso_id");
+  const pagina = `/admin/abbonamenti/nuovo${corsoId ? `?corso=${corsoId}` : ""}`;
 
   const utenteId = testo(formData, "utente_id");
   const tipo = testo(formData, "tipo");
@@ -23,20 +25,27 @@ export async function creaAbbonamento(formData: FormData) {
   const pagato = formData.get("pagato") === "on";
   const orariScelti = [...new Set(formData.getAll("orari").map(String))];
 
+  const { data: corso } = await supabase.from("corsi").select("id, nome, giorni_abbonamento").eq("id", corsoId).maybeSingle();
+  if (!corso) errore(pagina, "Scegli il corso.");
+  const quanti = corso.giorni_abbonamento as number;
+
   if (!utenteId || !tipo) errore(pagina, "Scegli il cliente e scrivi il tipo di abbonamento.");
   if (!DATA.test(dataInizio) || !DATA.test(dataFine)) errore(pagina, "Date non valide.");
   if (dataFine < dataInizio) errore(pagina, "La data di fine viene prima di quella di inizio.");
-  if (orariScelti.length !== 2) errore(pagina, "Devi scegliere esattamente 2 appuntamenti settimanali.");
+  if (orariScelti.length !== quanti) {
+    errore(pagina, `Per ${corso.nome} devi scegliere ${quanti === 1 ? "1 orario" : `${quanti} orari`} settimanali (ora: ${orariScelti.length}).`);
+  }
 
-  // Controllo sul database che i 2 orari esistano, siano attivi e in giorni diversi
+  // Controllo sul database: orari attivi, dello stesso corso, uno per giorno
   const { data: orari } = await supabase
     .from("orari_corso")
-    .select("id, giorno_settimana")
+    .select("id, giorno_settimana, corso_id")
     .in("id", orariScelti)
     .eq("attivo", true);
-  if (!orari || orari.length !== 2) errore(pagina, "Uno degli orari scelti non è più disponibile.");
-  if (orari[0].giorno_settimana === orari[1].giorno_settimana) {
-    errore(pagina, "I 2 appuntamenti devono essere in giorni diversi.");
+  if (!orari || orari.length !== orariScelti.length) errore(pagina, "Uno degli orari scelti non è più disponibile.");
+  if (orari.some((o: { corso_id: string }) => o.corso_id !== corsoId)) errore(pagina, "Gli orari devono essere tutti dello stesso corso.");
+  if (new Set(orari.map((o: { giorno_settimana: number }) => o.giorno_settimana)).size !== orari.length) {
+    errore(pagina, "Scegli al massimo un orario per giorno.");
   }
 
   const { data: nuovo, error } = await supabase

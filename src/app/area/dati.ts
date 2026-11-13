@@ -25,7 +25,7 @@ export type Abbonamento = {
   data_fine: string;
   pagato: boolean;
   abbonamenti_orari: {
-    orari_corso: { id: string; giorno_settimana: number; ora_inizio: string; corsi: { nome: string } | null } | null;
+    orari_corso: { id: string; corso_id: string; giorno_settimana: number; ora_inizio: string; corsi: { nome: string } | null } | null;
   }[];
 };
 
@@ -44,4 +44,4 @@ export async function postiLiberi(supabase: Supabase, lezioni: LezioneBase[]) {
 
 export const SELECT_MIE = "id, stato, tipo, da_confermare_staff, lezioni!inner(id, inizio, capienza, scadenza_conferma, annullata, corsi(nome))";
 export const SELECT_ABBONAMENTI =
-  "id, tipo, data_inizio, data_fine, pagato, abbonamenti_orari(orari_corso(id, giorno_settimana, ora_inizio, corsi(nome)))";
+  "id, tipo, data_inizio, data_fine, pagato, abbonamenti_orari(orari_corso(id, corso_id, giorno_settimana, ora_inizio, corsi(nome)))";

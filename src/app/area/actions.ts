@@ -10,7 +10,7 @@ function esito(tipo: "ok" | "errore", messaggio: string, pagina = "/area"): neve
   redirect(`${pagina}?${tipo}=${encodeURIComponent(messaggio)}`);
 }
 
-// Le regole (scadenza delle 17, posti liberi, "è davvero tua?") le controlla
+// Le regole (scadenza di conferma, posti liberi, "è davvero tua?") le controlla
 // il database dentro le funzioni: qui ci limitiamo a chiamarle.
 
 export async function conferma(formData: FormData) {

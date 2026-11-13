@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { BottoneInvio } from "@/components/BottoneInvio";
 import { Avviso, Badge, Card, Titolo, bottoneSecondario, parametro, type SearchParams } from "@/components/ui";
 import { richiediStaff } from "@/lib/sessione";
-import { data as formattaData, etichettaGiorno, giornoChiave, oraDi } from "@/lib/formato";
+import { data as formattaData, etichettaGiorno, giornoChiave, oraDi, quando } from "@/lib/formato";
 import { contaPosti, type StatoPrenotazione, type TipoPrenotazione } from "@/lib/posti";
 import { avvisaScadenza, sollecitaPagamento } from "./avvisi/actions";
 
@@ -202,15 +202,16 @@ export default async function OggiPage({ searchParams }: { searchParams: SearchP
         )}
 
         {/* 1. Lezioni di oggi */}
-        <Controllo titolo="Lezioni di oggi: conferme mancanti" numero={daConfermareOggi} vuoto={lezioni.length === 0 ? "Nessuna lezione oggi." : "Tutti hanno risposto."}>
+        <Controllo titolo="Oggi: abbonati che devono confermare" numero={daConfermareOggi} vuoto={lezioni.length === 0 ? "Nessuna lezione oggi." : "Tutti hanno risposto."}>
           <ul className="space-y-2 text-sm">
             {lezioni.map((l) => {
               const c = contaPosti(l.capienza, l.prenotazioni);
+              if (c.inAttesa === 0) return null; // mostro solo quelle con qualcuno da sentire
               return (
                 <li key={l.id}>
                   <Link href={`/admin/lezioni/${l.id}`} className="flex items-center justify-between gap-2 rounded-lg bg-schiuma px-3 py-2 hover:bg-riflesso/20">
                     <span>
-                      <strong>{l.corsi?.nome} {oraDi(l.inizio)}</strong> · entro le {oraDi(l.scadenza_conferma)}
+                      <strong>{l.corsi?.nome} {oraDi(l.inizio)}</strong> · entro {quando(l.scadenza_conferma)}
                     </span>
                     <span className="whitespace-nowrap text-amber-800">{c.inAttesa} da confermare →</span>
                   </Link>

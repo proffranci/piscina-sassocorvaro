@@ -55,3 +55,40 @@ export function etichettaGiorno(istante: string | Date) {
 export function oraDi(istante: string | Date) {
   return new Date(istante).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", timeZone: FUSO });
 }
+
+// "oggi alle 17:00", "domani alle 21:00", "sabato 15 novembre alle 06:00"
+export function quando(istante: string | Date) {
+  return `${etichettaGiorno(istante).toLowerCase()} alle ${oraDi(istante)}`;
+}
+
+// Per il campo <input type="datetime-local"> in ora italiana: "2026-11-14T17:00"
+export function perCampoDataOra(istante: string | Date) {
+  const d = new Date(istante);
+  const giorno = d.toLocaleDateString("sv-SE", { timeZone: FUSO });
+  const ora = d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: FUSO });
+  return `${giorno}T${ora}`;
+}
+
+// ---------- Scadenza di conferma ----------
+export type ModoScadenza = "stesso_giorno" | "giorno_prima" | "ore_prima";
+
+export function descriviScadenza(modo: string | null | undefined, oraFissa: string | null | undefined, orePrima: number | null | undefined) {
+  if (modo === "ore_prima") return `${orePrima ?? 2} ${orePrima === 1 ? "ora" : "ore"} prima dell'inizio`;
+  if (modo === "giorno_prima") return `il giorno prima entro le ${ora(oraFissa ?? "21:00")}`;
+  return `il giorno stesso entro le ${ora(oraFissa ?? "17:00")}`;
+}
+
+export function leggiScadenza(formData: FormData, obbligatoria: boolean) {
+  const modo = testo(formData, "scadenza_modo");
+  if (!modo && !obbligatoria) return { scadenza_modo: null, scadenza_ora: null, scadenza_ore_prima: null };
+  if (!["stesso_giorno", "giorno_prima", "ore_prima"].includes(modo)) return null;
+  const oraFissa = testo(formData, "scadenza_ora");
+  const ore = Number(testo(formData, "scadenza_ore_prima") || 2);
+  if (modo !== "ore_prima" && !/^\d{2}:\d{2}$/.test(oraFissa)) return null;
+  if (modo === "ore_prima" && !(Number.isInteger(ore) && ore >= 0 && ore <= 72)) return null;
+  return {
+    scadenza_modo: modo,
+    scadenza_ora: modo === "ore_prima" ? null : oraFissa,
+    scadenza_ore_prima: modo === "ore_prima" ? ore : null,
+  };
+}

@@ -125,3 +125,33 @@ export async function confermaIngresso(formData: FormData) {
   if (!data || data.length === 0) esito(torna, "errore", "Era già confermato.");
   esito(torna, "ok", "Confermato: il cliente ha ricevuto l'avviso.");
 }
+
+// Modifica la singola lezione (posti e scadenza): da lì in poi non segue più l'orario
+export async function modificaLezione(formData: FormData) {
+  const { supabase } = await richiediStaff();
+  const id = testo(formData, "lezione_id");
+  const pagina = `/admin/lezioni/${id}`;
+  const { error } = await supabase.rpc("modifica_lezione", {
+    p_lezione: id,
+    p_capienza: Number(testo(formData, "capienza")),
+    p_scadenza_locale: testo(formData, "scadenza"),
+  });
+  if (error) esito(pagina, "errore", messaggioDb(error, "Modifica non riuscita."));
+  esito(pagina, "ok", "Lezione aggiornata.");
+}
+
+// Annulla (o ripristina) una lezione: i prenotati ricevono l'avviso
+export async function annullaLezione(formData: FormData) {
+  const { supabase } = await richiediStaff();
+  const id = testo(formData, "lezione_id");
+  const pagina = `/admin/lezioni/${id}`;
+  const annulla = testo(formData, "annulla") === "si";
+  const { data, error } = await supabase.rpc("annulla_lezione", {
+    p_lezione: id,
+    p_annulla: annulla,
+    p_motivo: testo(formData, "motivo"),
+  });
+  if (error) esito(pagina, "errore", messaggioDb(error, "Operazione non riuscita."));
+  const n = Number(data ?? 0);
+  esito(pagina, "ok", `${annulla ? "Lezione annullata" : "Lezione ripristinata"}${n > 0 ? `: ${n} ${n === 1 ? "persona avvisata" : "persone avvisate"}` : ""}.`);
+}

@@ -4,9 +4,9 @@ import { notFound } from "next/navigation";
 import { BarraPosti } from "@/components/BarraPosti";
 import { Avviso, Card, Titolo, bottone, bottoneSecondario, campo, etichetta, parametro, type SearchParams } from "@/components/ui";
 import { richiediStaff } from "@/lib/sessione";
-import { etichettaGiorno, oraDi } from "@/lib/formato";
+import { etichettaGiorno, oraDi, perCampoDataOra, quando } from "@/lib/formato";
 import { contaPosti, type StatoPrenotazione, type TipoPrenotazione } from "@/lib/posti";
-import { aggiungiIngresso, confermaIngresso, confermaPerConto, liberaPosto } from "../actions";
+import { aggiungiIngresso, annullaLezione, confermaIngresso, confermaPerConto, liberaPosto, modificaLezione } from "../actions";
 import { BottoneInvio } from "@/components/BottoneInvio";
 
 type Prenotazione = {
@@ -26,6 +26,9 @@ type Lezione = {
   capienza: number;
   scadenza_conferma: string;
   annullata: boolean;
+  personalizzata: boolean;
+  motivo_annullamento: string | null;
+  orario_corso_id: string | null;
   corsi: { nome: string } | null;
   prenotazioni: Prenotazione[];
 };
@@ -50,7 +53,7 @@ export default async function LezionePage({
     supabase
       .from("lezioni")
       .select(
-        "id, inizio, fine, capienza, scadenza_conferma, annullata, corsi(nome), prenotazioni(id, stato, tipo, nome_ospite, confermata_il, da_confermare_staff, profili(nome, cognome, telefono, email))",
+        "id, inizio, fine, capienza, scadenza_conferma, annullata, personalizzata, motivo_annullamento, orario_corso_id, corsi(nome), prenotazioni(id, stato, tipo, nome_ospite, confermata_il, da_confermare_staff, profili(nome, cognome, telefono, email))",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -85,7 +88,7 @@ export default async function LezionePage({
   const gruppi = [
     {
       titolo: "Da confermare",
-      nota: confermeChiuse ? "Le conferme sono chiuse: tra pochi istanti questi posti verranno liberati." : `Entro le ${oraDi(lezione.scadenza_conferma)}`,
+      nota: confermeChiuse ? "Le conferme sono chiuse: tra pochi istanti questi posti verranno liberati." : `Entro ${quando(lezione.scadenza_conferma)}`,
       righe: lezione.prenotazioni.filter((p) => p.stato === "riservata").sort(ordina),
     },
     {
@@ -114,6 +117,11 @@ export default async function LezionePage({
       </Titolo>
       <Avviso errore={parametro(sp.errore)} ok={parametro(sp.ok)} />
 
+      {lezione.annullata && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <strong>Lezione annullata.</strong> {lezione.motivo_annullamento ?? ""} I prenotati sono stati avvisati.
+        </div>
+      )}
       <Card className="mb-6">
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
           <p className="text-lg font-semibold">
@@ -161,7 +169,7 @@ export default async function LezionePage({
                             etichetta=""
                             testo={
                               p.stato === "riservata" && !confermeChiuse
-                                ? testiWhatsApp.conferma(p.profili?.nome ?? "", titoloLezione, oraDi(lezione.scadenza_conferma))
+                                ? testiWhatsApp.conferma(p.profili?.nome ?? "", titoloLezione, quando(lezione.scadenza_conferma))
                                 : p.stato === "confermata"
                                   ? testiWhatsApp.confermata(p.profili?.nome ?? p.nome_ospite ?? "", titoloLezione)
                                   : testiWhatsApp.lezione(p.profili?.nome ?? "", titoloLezione)
@@ -239,6 +247,63 @@ export default async function LezionePage({
           </Card>
         )}
       </div>
+
+      {/* ---------- Modifica / annulla ---------- */}
+      {!iniziata && (
+        <div className="mt-8 grid gap-6 lg:grid-cols-2">
+          <Card>
+            <h2 className="mb-1 font-semibold">Modifica questa lezione</h2>
+            <p className="mb-4 text-sm text-slate-600">
+              Solo per questa data. {lezione.personalizzata && "Questa lezione è già personalizzata: non segue più le impostazioni dell'orario."}
+            </p>
+            <form action={modificaLezione} className="grid gap-4 sm:grid-cols-2">
+              <input type="hidden" name="lezione_id" value={lezione.id} />
+              <div>
+                <label className={etichetta} htmlFor="capienza">Posti</label>
+                <input id="capienza" name="capienza" type="number" min={1} max={500} defaultValue={lezione.capienza} className={campo} />
+              </div>
+              <div>
+                <label className={etichetta} htmlFor="scadenza">Scadenza conferma abbonati</label>
+                <input id="scadenza" name="scadenza" type="datetime-local" defaultValue={perCampoDataOra(lezione.scadenza_conferma)} className={campo} />
+              </div>
+              <div className="sm:col-span-2">
+                <BottoneInvio className={`${bottoneSecondario} w-full sm:w-auto`}>Salva modifiche</BottoneInvio>
+              </div>
+            </form>
+            {lezione.orario_corso_id && (
+              <p className="mt-4 text-xs text-slate-500">
+                Per cambiare tutte le lezioni di questo orario vai su{" "}
+                <Link href={`/admin/corsi/orari/${lezione.orario_corso_id}`} className="text-vasca underline">impostazioni dell&apos;orario</Link>.
+              </p>
+            )}
+          </Card>
+
+          <Card className={lezione.annullata ? "" : "border-red-200"}>
+            <h2 className="mb-1 font-semibold">{lezione.annullata ? "Ripristina la lezione" : "Annulla la lezione"}</h2>
+            <p className="mb-4 text-sm text-slate-600">
+              {lezione.annullata
+                ? "La lezione torna in calendario e i prenotati ricevono un avviso."
+                : "Es. chiusura o manutenzione: chi è prenotato riceve subito un avviso (app e notifica)."}
+            </p>
+            <form action={annullaLezione} className="space-y-3">
+              <input type="hidden" name="lezione_id" value={lezione.id} />
+              <input type="hidden" name="annulla" value={lezione.annullata ? "no" : "si"} />
+              {!lezione.annullata && (
+                <input name="motivo" maxLength={200} placeholder="Motivo (facoltativo), es. Manutenzione vasca" className={campo} />
+              )}
+              <BottoneInvio
+                className={
+                  lezione.annullata
+                    ? `${bottone} w-full sm:w-auto`
+                    : "inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 sm:w-auto"
+                }
+              >
+                {lezione.annullata ? "Ripristina" : "Annulla lezione"}
+              </BottoneInvio>
+            </form>
+          </Card>
+        </div>
+      )}
     </>
   );
 }
