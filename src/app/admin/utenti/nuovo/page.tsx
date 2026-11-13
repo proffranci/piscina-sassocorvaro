@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Avviso, Card, Titolo, bottone, bottoneSecondario, campo, etichetta, parametro, type SearchParams } from "@/components/ui";
 import { richiediStaff } from "@/lib/sessione";
 import { creaUtente } from "../actions";
+import { passwordTemporanea } from "@/lib/account";
 import { BottoneInvio } from "@/components/BottoneInvio";
 
 export default async function NuovoUtentePage({ searchParams }: { searchParams: SearchParams }) {
@@ -25,8 +26,21 @@ export default async function NuovoUtentePage({ searchParams }: { searchParams: 
             <input id="cognome" name="cognome" required className={campo} />
           </div>
           <div>
-            <label className={etichetta} htmlFor="email">Email</label>
-            <input id="email" name="email" type="email" required className={campo} />
+            <label className={etichetta} htmlFor="nome_utente">Nome utente (per accedere)</label>
+            <input
+              id="nome_utente"
+              name="nome_utente"
+              placeholder="vuoto = nome.cognome"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              className={campo}
+            />
+            <p className="mt-1 text-xs text-slate-500">Unico per ogni persona, es. mario.rossi o mario.rossi2.</p>
+          </div>
+          <div>
+            <label className={etichetta} htmlFor="email">Email (facoltativa)</label>
+            <input id="email" name="email" type="email" placeholder="solo se ce l'ha" className={campo} />
           </div>
           <div>
             <label className={etichetta} htmlFor="telefono">Telefono (per WhatsApp)</label>
@@ -34,8 +48,12 @@ export default async function NuovoUtentePage({ searchParams }: { searchParams: 
           </div>
           <div className="sm:col-span-2">
             <label className={etichetta} htmlFor="password">Password provvisoria</label>
-            <input id="password" name="password" type="text" minLength={8} required className={campo} autoComplete="off" />
-            <p className="mt-1 text-xs text-slate-500">Almeno 8 caratteri. Consegnala al cliente: potrà cambiarla in seguito.</p>
+            <input id="password" name="password" type="text" minLength={8} required defaultValue={passwordTemporanea()} className={`${campo} font-mono`} autoComplete="off" />
+            <p className="mt-1 text-xs text-slate-500">Già pronta (puoi cambiarla). Consegnala al cliente insieme al nome utente.</p>
+            <label className="mt-2 flex items-center gap-2 text-sm">
+              <input type="checkbox" name="obbliga_cambio" defaultChecked />
+              Al primo accesso deve sceglierne una sua
+            </label>
           </div>
           <fieldset className="sm:col-span-2">
             <legend className={etichetta}>Come preferisce ricevere gli avvisi?</legend>

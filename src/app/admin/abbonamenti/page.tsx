@@ -69,9 +69,9 @@ export default async function AbbonamentiPage({ searchParams }: { searchParams: 
             <Card key={a.id}>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="font-semibold">
+                  <Link href={`/admin/abbonamenti/${a.id}`} className="font-semibold text-vasca underline">
                     {a.profili ? `${a.profili.cognome} ${a.profili.nome}` : "Utente eliminato"}
-                  </p>
+                  </Link>
                   <p className="text-sm text-slate-600">{a.tipo}</p>
                 </div>
                 <div className="flex flex-col items-end gap-1">

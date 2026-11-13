@@ -14,7 +14,7 @@ export default async function UtentiPage({ searchParams }: { searchParams: Searc
   if (cerca) {
     // Tolgo i caratteri speciali per non rompere il filtro
     const pulito = cerca.replace(/[%,()]/g, " ");
-    query = query.or(`nome.ilike.%${pulito}%,cognome.ilike.%${pulito}%,email.ilike.%${pulito}%`);
+    query = query.or(`nome.ilike.%${pulito}%,cognome.ilike.%${pulito}%,email.ilike.%${pulito}%,nome_utente.ilike.%${pulito}%`);
   }
   const { data } = await query;
   const utenti = (data ?? []) as unknown as Profilo[];
@@ -26,7 +26,7 @@ export default async function UtentiPage({ searchParams }: { searchParams: Searc
       <Avviso errore={parametro(params.errore)} ok={parametro(params.ok)} />
 
       <form className="mb-4 flex gap-2">
-        <input name="cerca" defaultValue={cerca} placeholder="Cerca per nome, cognome o email" className={campo} />
+        <input name="cerca" defaultValue={cerca} placeholder="Cerca per nome, nome utente o email" className={campo} />
         <BottoneInvio className={bottoneSecondario}>Cerca</BottoneInvio>
       </form>
 
@@ -37,9 +37,9 @@ export default async function UtentiPage({ searchParams }: { searchParams: Searc
           <li key={u.id}>
             <Card className="p-4">
               <div className="flex items-start justify-between gap-2">
-                <p className="font-semibold">
+                <Link href={`/admin/utenti/${u.id}`} className="font-semibold text-vasca underline">
                   {u.cognome} {u.nome}
-                </p>
+                </Link>
                 <div className="flex shrink-0 gap-1">
                   {u.ruolo !== "utente" && <Badge tono="attenzione">{u.ruolo}</Badge>}
                   {!u.attivo && <Badge>disattivato</Badge>}
@@ -96,7 +96,12 @@ export default async function UtentiPage({ searchParams }: { searchParams: Searc
             )}
             {utenti.map((u) => (
               <tr key={u.id} className="border-b border-slate-100 last:border-0">
-                <td className="px-4 py-3 font-medium">{u.cognome} {u.nome}</td>
+                <td className="px-4 py-3">
+                  <Link href={`/admin/utenti/${u.id}`} className="font-medium text-vasca underline">
+                    {u.cognome} {u.nome}
+                  </Link>
+                  {u.nome_utente && <div className="text-xs text-slate-500">@{u.nome_utente}</div>}
+                </td>
                 <td className="px-4 py-3 text-slate-600">
                   <div>{u.email}</div>
                   {u.telefono && <div>{u.telefono}</div>}

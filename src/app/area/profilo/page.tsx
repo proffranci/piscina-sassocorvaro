@@ -1,18 +1,45 @@
+import Link from "next/link";
 import { AttivaNotifiche } from "@/components/AttivaNotifiche";
 import { BottoneInvio } from "@/components/BottoneInvio";
 import { Avviso, Badge, Card, bottone, bottoneSecondario, campo, etichetta, parametro, type SearchParams } from "@/components/ui";
-import { aggiornaPreferenze } from "../actions";
+import { aggiornaPreferenze, richiediCambio } from "../actions";
 import { richiediUtente } from "@/lib/sessione";
 import { data as formattaData, nomeGiorno, ora } from "@/lib/formato";
 import { SELECT_ABBONAMENTI, type Abbonamento } from "../dati";
+
+type Orario = { id: string; giorno_settimana: number; ora_inizio: string; corsi: { nome: string } | null };
+type Richiesta = {
+  id: string;
+  abbonamento_id: string;
+  orario_vecchio_id: string;
+  orario_nuovo_id: string;
+  stato: "in_attesa" | "approvata" | "rifiutata";
+  risposta: string | null;
+  creata_il: string;
+};
 
 export default async function ProfiloPage({ searchParams }: { searchParams: SearchParams }) {
   const { supabase, profilo } = await richiediUtente();
   const sp = await searchParams;
   const oggiData = new Date().toISOString().slice(0, 10);
 
-  const { data } = await supabase.from("abbonamenti").select(SELECT_ABBONAMENTI).gte("data_fine", oggiData).order("data_inizio");
-  const abbonamenti = (data ?? []) as unknown as Abbonamento[];
+  const [abbRes, orariRes, richiesteRes] = await Promise.all([
+    supabase.from("abbonamenti").select(SELECT_ABBONAMENTI).gte("data_fine", oggiData).order("data_inizio"),
+    supabase.from("orari_corso").select("id, giorno_settimana, ora_inizio, corsi(nome)").eq("attivo", true).order("giorno_settimana").order("ora_inizio"),
+    supabase
+      .from("richieste_cambio")
+      .select("id, abbonamento_id, orario_vecchio_id, orario_nuovo_id, stato, risposta, creata_il")
+      .eq("utente_id", profilo.id)
+      .order("creata_il", { ascending: false })
+      .limit(10),
+  ]);
+  const abbonamenti = (abbRes.data ?? []) as unknown as Abbonamento[];
+  const orari = (orariRes.data ?? []) as unknown as Orario[];
+  const richieste = (richiesteRes.data ?? []) as unknown as Richiesta[];
+  const nomeOrario = (id: string) => {
+    const o = orari.find((x) => x.id === id);
+    return o ? `${nomeGiorno(o.giorno_settimana)} ${ora(o.ora_inizio)}` : "orario non più attivo";
+  };
 
   return (
     <>
@@ -35,7 +62,21 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Sear
             <dd className="font-medium">{profilo.telefono ?? "—"}</dd>
           </div>
         </dl>
-        <p className="mt-4 text-xs text-slate-500">Per modificare nome ed email chiedi in reception.</p>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+          <p className="text-sm">
+            {profilo.nome_utente ? (
+              <>
+                Accedi con <strong className="font-mono">{profilo.nome_utente}</strong>
+              </>
+            ) : (
+              "Accedi con la tua email"
+            )}
+          </p>
+          <Link href="/cambia-password" className={bottoneSecondario}>
+            🔑 Cambia password
+          </Link>
+        </div>
+        <p className="mt-3 text-xs text-slate-500">Per modificare nome ed email chiedi in reception.</p>
       </Card>
 
       {/* Preferenza di contatto: la sceglie il cliente */}
@@ -104,6 +145,70 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Sear
             </div>
           </>
         )}
+      {/* ---------- Cambio giorno ---------- */}
+      {abbonamenti.map((a) => {
+        const miei = a.abbonamenti_orari.map((x) => x.orari_corso).filter((o): o is NonNullable<typeof o> => !!o);
+        if (miei.length === 0) return null;
+        const mieiId = new Set(miei.map((o) => o.id));
+        const alternative = orari.filter((o) => !mieiId.has(o.id));
+        const inAttesa = richieste.find((r) => r.abbonamento_id === a.id && r.stato === "in_attesa");
+        const ultima = richieste.find((r) => r.abbonamento_id === a.id && r.stato !== "in_attesa");
+        return (
+          <Card key={`cambio-${a.id}`} className="mb-8">
+            <h2 className="mb-1 font-semibold">Vuoi cambiare un giorno fisso?</h2>
+            {inAttesa ? (
+              <p className="text-sm text-amber-800">
+                ⏳ Richiesta in attesa: {nomeOrario(inAttesa.orario_vecchio_id)} → {nomeOrario(inAttesa.orario_nuovo_id)}. Ti
+                risponderemo tra gli Avvisi.
+              </p>
+            ) : (
+              <>
+                {ultima && (
+                  <p className={`mb-3 text-sm ${ultima.stato === "approvata" ? "text-emerald-700" : "text-slate-600"}`}>
+                    Ultima richiesta {ultima.stato === "approvata" ? "approvata ✓" : "non accettata"}
+                    {ultima.risposta ? `: "${ultima.risposta}"` : "."}
+                  </p>
+                )}
+                <p className="mb-4 text-sm text-slate-600">Scegli quale giorno cambiare e il nuovo orario: la reception approverà la richiesta.</p>
+                <form action={richiediCambio} className="grid gap-3 sm:grid-cols-2">
+                  <input type="hidden" name="abbonamento_id" value={a.id} />
+                  <div>
+                    <label className={etichetta} htmlFor={`vecchio-${a.id}`}>Giorno da cambiare</label>
+                    <select id={`vecchio-${a.id}`} name="vecchio" required className={campo}>
+                      {miei.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {nomeGiorno(o.giorno_settimana)} {ora(o.ora_inizio)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={etichetta} htmlFor={`nuovo-${a.id}`}>Nuovo orario</label>
+                    <select id={`nuovo-${a.id}`} name="nuovo" required className={campo} defaultValue="">
+                      <option value="" disabled>
+                        Scegli…
+                      </option>
+                      {alternative.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {nomeGiorno(o.giorno_settimana)} {ora(o.ora_inizio)} · {o.corsi?.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className={etichetta} htmlFor={`nota-${a.id}`}>Nota (facoltativa)</label>
+                    <input id={`nota-${a.id}`} name="nota" maxLength={300} placeholder="Es. il martedì lavoro fino a tardi" className={campo} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <BottoneInvio className={`${bottone} w-full sm:w-auto`}>Invia richiesta</BottoneInvio>
+                  </div>
+                </form>
+              </>
+            )}
+          </Card>
+        );
+      })}
+
       {abbonamenti.length === 0 && (
         <Card className="mb-8">
           <p className="text-sm text-slate-600">Non hai abbonamenti attivi. Chiedi informazioni in reception.</p>

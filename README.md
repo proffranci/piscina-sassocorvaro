@@ -41,6 +41,7 @@ src/app/area           area del cliente
 - [x] **Avvisi nell'app** – notifiche ai clienti, solleciti di pagamento, promemoria automatici, pagina "Oggi" con cronologia per lo staff
 - [x] **Notifiche push** (Android, computer, iPhone con app installata) e **pulsanti WhatsApp** con testo pronto
 - [x] **Novità per lo staff** – campanella con numerino per ogni operazione dei clienti, push anche allo staff, diagnosi delle consegne
+- [x] **Account e cambi giorno** – nome utente unico, scheda utente, password temporanea, cambio password obbligatorio, richieste di cambio giorno
 - [ ] **Email** – promemoria anche via email
 - [ ] **Fase 3** – prenotazione corsie
 - [ ] **Fase 4** – WhatsApp, report, rifiniture grafiche

@@ -17,6 +17,7 @@ type Novita = {
 // I filtri in alto: ogni filtro raggruppa uno o più tipi di operazione
 const FILTRI: { chiave: string; etichetta: string; tipi: string[] | null }[] = [
   { chiave: "tutte", etichetta: "Tutte", tipi: null },
+  { chiave: "richieste", etichetta: "📝 Richieste", tipi: ["richiesta"] },
   { chiave: "disdette", etichetta: "↩️ Disdette", tipi: ["disdetta"] },
   { chiave: "prenotazioni", etichetta: "🎟️ Prenotazioni", tipi: ["prenotazione", "ripreso"] },
   { chiave: "conferme", etichetta: "✅ Conferme", tipi: ["conferma"] },
@@ -29,6 +30,7 @@ const ICONE: Record<string, string> = {
   ripreso: "🔁",
   conferma: "✅",
   preferenza: "👤",
+  richiesta: "📝",
 };
 
 export default async function NovitaPage({ searchParams }: { searchParams: SearchParams }) {
@@ -68,7 +70,7 @@ export default async function NovitaPage({ searchParams }: { searchParams: Searc
 
       <Titolo>Novità</Titolo>
       <p className="-mt-4 mb-5 max-w-2xl text-sm text-slate-600">
-        Quello che fanno i clienti dall&apos;app: disdette, posti ripresi, prenotazioni, conferme, cambi di preferenza.
+        Quello che fanno i clienti dall&apos;app: richieste di cambio giorno, disdette, posti ripresi, prenotazioni, conferme, cambi di preferenza.
         {nuove > 0 && <strong className="text-abisso"> {nuove === 1 ? "1 nuova" : `${nuove} nuove`} dall&apos;ultima visita.</strong>}
       </p>
 
