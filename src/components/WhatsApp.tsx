@@ -62,6 +62,8 @@ export const testiWhatsApp = {
     `Ciao ${nome}! Il tuo abbonamento "${tipo}" alla Piscina di Sassocorvaro è scaduto. Vuoi rinnovarlo? Ti aspettiamo in reception!`,
   conferma: (nome: string, lezione: string, entro: string) =>
     `Ciao ${nome}! Ricordati di confermare la tua presenza a ${lezione} entro le ${entro}, altrimenti il posto viene liberato. Puoi farlo dall'app: ${SITO}`,
+  confermata: (nome: string, lezione: string) =>
+    `Ciao ${nome}! La tua prenotazione per ${lezione} è confermata ✓ Ti aspettiamo in vasca! 🏊\nPiscina di Sassocorvaro`,
   lezione: (nome: string, lezione: string) => `Ciao ${nome}! Ti scriviamo dalla Piscina di Sassocorvaro per la lezione di ${lezione}.`,
   avviso: (nome: string, titolo: string, testo: string) =>
     `Ciao ${nome}! ${titolo}${testo ? `\n\n${testo}` : ""}\n\nPiscina di Sassocorvaro`,

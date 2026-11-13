@@ -152,7 +152,9 @@ export default async function LezionePage({
                             testo={
                               p.stato === "riservata" && !confermeChiuse
                                 ? testiWhatsApp.conferma(p.profili?.nome ?? "", titoloLezione, oraDi(lezione.scadenza_conferma))
-                                : testiWhatsApp.lezione(p.profili?.nome ?? "", titoloLezione)
+                                : p.stato === "confermata"
+                                  ? testiWhatsApp.confermata(p.profili?.nome ?? p.nome_ospite ?? "", titoloLezione)
+                                  : testiWhatsApp.lezione(p.profili?.nome ?? "", titoloLezione)
                             }
                           />
                         )}
