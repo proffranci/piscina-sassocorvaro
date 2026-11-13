@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { richiediStaff } from "@/lib/sessione";
 import { testo } from "@/lib/formato";
+import { messaggioDb } from "@/lib/errori";
 
 function errore(percorso: string, messaggio: string): never {
   redirect(`${percorso}?errore=${encodeURIComponent(messaggio)}`);
@@ -72,4 +73,36 @@ export async function cambiaPagato(formData: FormData) {
     .eq("id", testo(formData, "id"));
   if (error) errore("/admin/abbonamenti", "Modifica non riuscita.");
   redirect(`/admin/abbonamenti?ok=${encodeURIComponent("Pagamento aggiornato.")}`);
+}
+
+const RITORNI_CAMBIO = ["/admin", "/admin/abbonamenti"];
+
+// Lo staff cambia direttamente uno dei 2 giorni fissi
+export async function cambiaGiorno(formData: FormData) {
+  const { supabase } = await richiediStaff();
+  const id = testo(formData, "abbonamento_id");
+  const pagina = `/admin/abbonamenti/${id}`;
+  const { error } = await supabase.rpc("cambia_orario_abbonamento", {
+    p_abbonamento: id,
+    p_vecchio: testo(formData, "vecchio"),
+    p_nuovo: testo(formData, "nuovo"),
+  });
+  if (error) errore(pagina, messaggioDb(error, "Cambio non riuscito."));
+  redirect(`${pagina}?ok=${encodeURIComponent("Giorno cambiato: i posti sono stati spostati sul nuovo orario.")}`);
+}
+
+// Approva o rifiuta la richiesta di un cliente
+export async function gestisciRichiesta(formData: FormData) {
+  const { supabase } = await richiediStaff();
+  const approva = testo(formData, "esito") === "approva";
+  const tornaScritto = testo(formData, "torna");
+  const torna = RITORNI_CAMBIO.includes(tornaScritto) || /^\/admin\/abbonamenti\/[0-9a-f-]{36}$/.test(tornaScritto) ? tornaScritto : "/admin";
+
+  const { error } = await supabase.rpc("gestisci_richiesta", {
+    p_richiesta: testo(formData, "richiesta_id"),
+    p_approva: approva,
+    p_risposta: testo(formData, "risposta"),
+  });
+  if (error) errore(torna, messaggioDb(error, "Operazione non riuscita."));
+  redirect(`${torna}?ok=${encodeURIComponent(approva ? "Cambio approvato: il cliente è stato avvisato." : "Richiesta rifiutata: il cliente è stato avvisato.")}`);
 }

@@ -88,3 +88,16 @@ export async function aggiornaPreferenze(formData: FormData) {
   if (error) esito("errore", messaggioDb(error, "Non sono riuscito a salvare la preferenza."), "/area/profilo");
   esito("ok", "Preferenza salvata.", "/area/profilo");
 }
+
+// Il cliente chiede di cambiare uno dei suoi 2 giorni fissi
+export async function richiediCambio(formData: FormData) {
+  const { supabase } = await richiediUtente();
+  const { error } = await supabase.rpc("richiedi_cambio_giorno", {
+    p_abbonamento: testo(formData, "abbonamento_id"),
+    p_vecchio: testo(formData, "vecchio"),
+    p_nuovo: testo(formData, "nuovo"),
+    p_nota: testo(formData, "nota"),
+  });
+  if (error) esito("errore", messaggioDb(error, "Non sono riuscito a inviare la richiesta."), "/area/profilo");
+  esito("ok", "Richiesta inviata alla reception: riceverai la risposta tra gli Avvisi.", "/area/profilo");
+}

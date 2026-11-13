@@ -3,7 +3,7 @@ import { Avviso, Logo, bottone, campo, etichetta, parametro, type SearchParams }
 import { BottoneInvio } from "@/components/BottoneInvio";
 
 const MESSAGGI: Record<string, string> = {
-  credenziali: "Email o password non corrette.",
+  credenziali: "Nome utente o password non corretti.",
   campi: "Inserisci email e password.",
   non_confermata: "L'account non è ancora confermato. Contatta la reception.",
   configurazione: "Il servizio non è configurato correttamente. Riprova più tardi.",
@@ -37,14 +37,14 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
             <Logo />
           </div>
           <h1 className="mb-1 text-2xl font-bold">Accedi</h1>
-          <p className="mb-6 text-sm text-slate-600">Usa l&apos;email e la password ricevute in piscina.</p>
+          <p className="mb-6 text-sm text-slate-600">Usa il nome utente (o l&apos;email) e la password ricevuti in piscina.</p>
 
           <Avviso errore={errore} />
 
           <form action={accedi} className="space-y-4">
             <div>
-              <label htmlFor="email" className={etichetta}>Email</label>
-              <input id="email" name="email" type="email" autoComplete="email" required className={campo} />
+              <label htmlFor="email" className={etichetta}>Nome utente o email</label>
+              <input id="email" name="email" type="text" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="es. mario.rossi" required className={campo} />
             </div>
             <div>
               <label htmlFor="password" className={etichetta}>Password</label>

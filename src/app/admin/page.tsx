@@ -1,3 +1,4 @@
+import { RichiestaCambio, SELECT_RICHIESTE, type RichiestaStaff } from "@/components/RichiestaCambio";
 import { BottoneWhatsApp, testiWhatsApp } from "@/components/WhatsApp";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -37,6 +38,8 @@ const ICONE: Record<string, string> = {
   abbonamento: "🪪",
   avviso: "🔔",
   ripreso: "🔁",
+  richiesta: "📝",
+  cambio_giorno: "🔄",
   preferenza: "👤",
 };
 
@@ -79,7 +82,7 @@ export default async function OggiPage({ searchParams }: { searchParams: SearchP
   const fineGiorno = new Date(adesso.getTime() + 36 * 3_600_000).toISOString();
 
   // Tutte le richieste partono insieme: una sola attesa invece di cinque
-  const [lezRes, daPagareRes, inScadRes, scadutiRes, cronoRes] = await Promise.all([
+  const [lezRes, daPagareRes, inScadRes, scadutiRes, cronoRes, richiesteRes] = await Promise.all([
     supabase
       .from("lezioni")
       .select("id, inizio, capienza, scadenza_conferma, annullata, corsi(nome), prenotazioni(stato, tipo)")
@@ -105,7 +108,9 @@ export default async function OggiPage({ searchParams }: { searchParams: SearchP
       .gte("data_fine", meno7)
       .order("data_fine", { ascending: false }),
     supabase.from("attivita").select("id, creata_il, tipo, descrizione").order("creata_il", { ascending: false }).limit(60),
+    supabase.from("richieste_cambio").select(SELECT_RICHIESTE).eq("stato", "in_attesa").order("creata_il"),
   ]);
+  const richieste = (richiesteRes.data ?? []) as unknown as RichiestaStaff[];
 
   const lezioni = ((lezRes.data ?? []) as unknown as LezioneOggi[]).filter(
     (l) => giornoChiave(l.inizio) === oggi && !l.annullata,
@@ -140,6 +145,17 @@ export default async function OggiPage({ searchParams }: { searchParams: SearchP
 
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Da controllare</h2>
       <div className="grid gap-4 md:grid-cols-2">
+        {/* 0. Richieste dei clienti: sempre in cima quando ce ne sono */}
+        {richieste.length > 0 && (
+          <Controllo titolo="Richieste di cambio giorno" numero={richieste.length} vuoto="">
+            <div className="space-y-3">
+              {richieste.map((r) => (
+                <RichiestaCambio key={r.id} r={r} torna="/admin" />
+              ))}
+            </div>
+          </Controllo>
+        )}
+
         {/* 1. Lezioni di oggi */}
         <Controllo titolo="Lezioni di oggi: conferme mancanti" numero={daConfermareOggi} vuoto={lezioni.length === 0 ? "Nessuna lezione oggi." : "Tutti hanno risposto."}>
           <ul className="space-y-2 text-sm">

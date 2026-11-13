@@ -3,14 +3,33 @@
 import { redirect } from "next/navigation";
 import { creaClientServer } from "@/lib/supabase/server";
 import { testo } from "@/lib/formato";
+import { emailDiServizio, emailPerAccesso } from "@/lib/account";
+import { creaClientAdmin } from "@/lib/supabase/admin";
 
 export async function accedi(formData: FormData) {
-  const email = testo(formData, "email").toLowerCase();
+  const scritto = testo(formData, "email");
   const password = String(formData.get("password") ?? "");
-  if (!email || !password) redirect("/login?errore=campi");
+  if (!scritto || !password) redirect("/login?errore=campi");
 
   const supabase = await creaClientServer();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  // Nome utente ("mario.rossi") oppure email vera
+  let { error } = await supabase.auth.signInWithPassword({ email: emailPerAccesso(scritto), password });
+
+  // Ha scritto l'email di contatto ma il suo account usa il nome utente?
+  // Cerchiamo il nome utente (lato server, senza rivelare nulla a chi prova)
+  if (error && scritto.includes("@") && error.code === "invalid_credentials") {
+    const { data } = await creaClientAdmin()
+      .from("profili")
+      .select("nome_utente")
+      .ilike("email", scritto.trim())
+      .not("nome_utente", "is", null)
+      .limit(1)
+      .maybeSingle();
+    const nomeUtente = (data as { nome_utente: string } | null)?.nome_utente;
+    if (nomeUtente) {
+      ({ error } = await supabase.auth.signInWithPassword({ email: emailDiServizio(nomeUtente), password }));
+    }
+  }
 
   if (error) {
     // Il dettaglio va nei log di Vercel (non all'utente), cosi possiamo capire cosa succede

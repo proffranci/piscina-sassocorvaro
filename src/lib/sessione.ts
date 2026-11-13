@@ -16,6 +16,8 @@ export type Profilo = {
   consenso_whatsapp: boolean;
   attivo: boolean;
   creato_il: string;
+  nome_utente: string | null;
+  deve_cambiare_password: boolean;
 };
 
 // Chi e l'utente loggato? Restituisce null se nessuno e entrato.
@@ -44,6 +46,7 @@ export function isStaff(profilo: Profilo | null) {
 export async function richiediStaff() {
   const sessione = await getSessione();
   if (!sessione) redirect("/login");
+  if (sessione.profilo?.deve_cambiare_password) redirect("/cambia-password");
   if (!sessione.profilo || !isStaff(sessione.profilo)) redirect("/area");
   return { ...sessione, profilo: sessione.profilo };
 }
@@ -51,5 +54,7 @@ export async function richiediStaff() {
 export async function richiediUtente() {
   const sessione = await getSessione();
   if (!sessione || !sessione.profilo) redirect("/login");
+  // Password temporanea data dalla reception: prima di tutto va cambiata
+  if (sessione.profilo.deve_cambiare_password) redirect("/cambia-password");
   return { ...sessione, profilo: sessione.profilo };
 }
