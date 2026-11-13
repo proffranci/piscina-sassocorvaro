@@ -14,6 +14,7 @@ export type MiaPrenotazione = {
   id: string;
   stato: StatoPrenotazione;
   tipo: TipoPrenotazione;
+  da_confermare_staff: boolean;
   lezioni: LezioneBase;
 };
 
@@ -41,6 +42,6 @@ export async function postiLiberi(supabase: Supabase, lezioni: LezioneBase[]) {
   return (l: LezioneBase) => Math.max(0, l.capienza - (occupati.get(l.id) ?? 0));
 }
 
-export const SELECT_MIE = "id, stato, tipo, lezioni!inner(id, inizio, capienza, scadenza_conferma, annullata, corsi(nome))";
+export const SELECT_MIE = "id, stato, tipo, da_confermare_staff, lezioni!inner(id, inizio, capienza, scadenza_conferma, annullata, corsi(nome))";
 export const SELECT_ABBONAMENTI =
   "id, tipo, data_inizio, data_fine, pagato, abbonamenti_orari(orari_corso(id, giorno_settimana, ora_inizio, corsi(nome)))";

@@ -1,3 +1,4 @@
+import { confermaIngresso } from "./lezioni/actions";
 import { RichiestaCambio, SELECT_RICHIESTE, type RichiestaStaff } from "@/components/RichiestaCambio";
 import { BottoneWhatsApp, testiWhatsApp } from "@/components/WhatsApp";
 import Link from "next/link";
@@ -25,6 +26,13 @@ type Abb = {
   data_fine: string;
   pagato: boolean;
   profili: { nome: string; cognome: string; telefono: string | null } | null;
+};
+
+type IngressoDaConfermare = {
+  id: string;
+  lezione_id: string;
+  profili: { nome: string; cognome: string; telefono: string | null } | null;
+  lezioni: { inizio: string; corsi: { nome: string } | null };
 };
 
 type Attivita = { id: number; creata_il: string; tipo: string; descrizione: string };
@@ -82,7 +90,7 @@ export default async function OggiPage({ searchParams }: { searchParams: SearchP
   const fineGiorno = new Date(adesso.getTime() + 36 * 3_600_000).toISOString();
 
   // Tutte le richieste partono insieme: una sola attesa invece di cinque
-  const [lezRes, daPagareRes, inScadRes, scadutiRes, cronoRes, richiesteRes] = await Promise.all([
+  const [lezRes, daPagareRes, inScadRes, scadutiRes, cronoRes, richiesteRes, ingressiRes] = await Promise.all([
     supabase
       .from("lezioni")
       .select("id, inizio, capienza, scadenza_conferma, annullata, corsi(nome), prenotazioni(stato, tipo)")
@@ -109,7 +117,16 @@ export default async function OggiPage({ searchParams }: { searchParams: SearchP
       .order("data_fine", { ascending: false }),
     supabase.from("attivita").select("id, creata_il, tipo, descrizione").order("creata_il", { ascending: false }).limit(60),
     supabase.from("richieste_cambio").select(SELECT_RICHIESTE).eq("stato", "in_attesa").order("creata_il"),
+    supabase
+      .from("prenotazioni")
+      .select("id, lezione_id, profili(nome, cognome, telefono), lezioni!inner(inizio, corsi(nome))")
+      .eq("da_confermare_staff", true)
+      .eq("stato", "confermata")
+      .gte("lezioni.inizio", adesso.toISOString()),
   ]);
+  const ingressiDaConfermare = ((ingressiRes.data ?? []) as unknown as IngressoDaConfermare[]).sort((a, b) =>
+    a.lezioni.inizio.localeCompare(b.lezioni.inizio),
+  );
   const richieste = (richiesteRes.data ?? []) as unknown as RichiestaStaff[];
 
   const lezioni = ((lezRes.data ?? []) as unknown as LezioneOggi[]).filter(
@@ -153,6 +170,34 @@ export default async function OggiPage({ searchParams }: { searchParams: SearchP
                 <RichiestaCambio key={r.id} r={r} torna="/admin" />
               ))}
             </div>
+          </Controllo>
+        )}
+
+        {/* Ingressi singoli che aspettano la conferma della reception */}
+        {ingressiDaConfermare.length > 0 && (
+          <Controllo titolo="Ingressi da confermare" numero={ingressiDaConfermare.length} vuoto="">
+            <ul className="divide-y divide-slate-100 text-sm">
+              {ingressiDaConfermare.map((p) => {
+                const lezione = `${p.lezioni.corsi?.nome ?? "Lezione"} ${etichettaGiorno(p.lezioni.inizio).toLowerCase()} alle ${oraDi(p.lezioni.inizio)}`;
+                return (
+                  <li key={p.id} className="flex items-center justify-between gap-2 py-2">
+                    <span>
+                      <strong>{p.profili ? `${p.profili.cognome} ${p.profili.nome}` : "—"}</strong>
+                      <span className="block text-xs text-slate-500">{lezione}</span>
+                    </span>
+                    <span className="flex shrink-0 gap-2">
+                      <BottoneWhatsApp telefono={p.profili?.telefono} testo={testiWhatsApp.confermata(p.profili?.nome ?? "", lezione)} etichetta="" />
+                      <form action={confermaIngresso}>
+                        <input type="hidden" name="id" value={p.id} />
+                        <input type="hidden" name="lezione_id" value={p.lezione_id} />
+                        <input type="hidden" name="torna" value="/admin" />
+                        <BottoneInvio className={bottoneSecondario}>✓ Conferma</BottoneInvio>
+                      </form>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
           </Controllo>
         )}
 
