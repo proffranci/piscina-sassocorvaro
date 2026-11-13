@@ -6,7 +6,8 @@ import { testo } from "@/lib/formato";
 import { messaggioDb } from "@/lib/errori";
 
 function errore(percorso: string, messaggio: string): never {
-  redirect(`${percorso}?errore=${encodeURIComponent(messaggio)}`);
+  const sep = percorso.includes("?") ? "&" : "?";
+  redirect(`${percorso}${sep}errore=${encodeURIComponent(messaggio)}`);
 }
 
 const DATA = /^\d{4}-\d{2}-\d{2}$/;
@@ -15,8 +16,6 @@ export async function creaAbbonamento(formData: FormData) {
   const { supabase } = await richiediStaff();
   const corsoId = testo(formData, "corso_id");
   const pagina = `/admin/abbonamenti/nuovo${corsoId ? `?corso=${corsoId}` : ""}`;
-  const sep = corsoId ? "&" : "?";
-  const errore = (p: string, m: string): never => redirect(`${p}${sep}errore=${encodeURIComponent(m)}`);
 
   const utenteId = testo(formData, "utente_id");
   const tipo = testo(formData, "tipo");
