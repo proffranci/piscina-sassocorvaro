@@ -54,6 +54,7 @@ src/app/area           area del cliente
   - eliminare orari, corsi (admin) e account (con conferma scritta)
   - pagamenti con data, modalità e importo, acconti, ricevuta numerata (n/anno) stampabile o in PDF, annullo con motivo, export CSV del mese
   - ingresso: QR personale nell'app (Tessera), tessera stampabile, tessere/braccialetti RFID-NFC; la reception legge con la fotocamera, con un lettore USB o con l'NFC del telefono Android e vede subito verde/giallo/rosso
+- [x] **Pagamenti verificati** (script `0014`): "pagato" non si cambia più a mano, lo calcola il database dai pagamenti con ricevuta; quelli registrati dallo staff restano "in verifica" finché l'admin non li conferma; "Ha saldato" in un clic dalla scheda utente; il cliente riceve "Abbonamento saldato ✓"
 - [ ] **Email** – promemoria anche via email
 - [ ] **Fase 3** – prenotazione corsie
 - [ ] **Fase 4** – WhatsApp, report, rifiniture grafiche

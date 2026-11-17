@@ -4,6 +4,7 @@ import { Avviso, Badge, Card, bottoneSecondario, parametro, type SearchParams } 
 import { richiediUtente } from "@/lib/sessione";
 import { data as formattaData, etichettaGiorno, oraDi, oggiItalia } from "@/lib/formato";
 import { testoQr } from "@/lib/ingresso";
+import { SELECT_PAGAMENTI_ABB, statoPagamento, type PagamentoBreve } from "@/lib/pagamenti";
 import { rigeneraMioQr } from "../actions";
 
 export const metadata = { title: "La mia tessera · Piscina Sassocorvaro" };
@@ -15,10 +16,18 @@ export default async function TesseraPage({ searchParams }: { searchParams: Sear
   const oggi = oggiItalia();
 
   const [abbRes, ingRes] = await Promise.all([
-    supabase.from("abbonamenti").select("id, tipo, data_inizio, data_fine, pagato").lte("data_inizio", oggi).gte("data_fine", oggi).order("data_fine"),
+    supabase.from("abbonamenti").select(`id, tipo, data_inizio, data_fine, pagato, prezzo, ${SELECT_PAGAMENTI_ABB}`).lte("data_inizio", oggi).gte("data_fine", oggi).order("data_fine"),
     supabase.from("ingressi").select("id, creato_il, esito").eq("utente_id", profilo.id).neq("esito", "negato").order("creato_il", { ascending: false }).limit(5),
   ]);
-  const abbonamenti = (abbRes.data ?? []) as { id: string; tipo: string; data_inizio: string; data_fine: string; pagato: boolean }[];
+  const abbonamenti = (abbRes.data ?? []) as unknown as ({
+    id: string;
+    tipo: string;
+    data_inizio: string;
+    data_fine: string;
+    pagato: boolean;
+    prezzo: number | string | null;
+    pagamenti: PagamentoBreve[];
+  })[];
   const ingressi = (ingRes.data ?? []) as { id: number; creato_il: string; esito: string }[];
 
   // Il QR disegnato sul server: niente da scaricare sul telefono
@@ -57,7 +66,7 @@ export default async function TesseraPage({ searchParams }: { searchParams: Sear
             {abbonamenti.map((a) => (
               <Badge key={a.id} tono={a.pagato ? "ok" : "attenzione"}>
                 {a.tipo} · fino al {formattaData(a.data_fine)}
-                {a.pagato ? "" : " · da pagare"}
+                {a.pagato ? "" : statoPagamento(a).stato === "in_verifica" ? " · pagamento in verifica" : " · da pagare"}
               </Badge>
             ))}
           </div>

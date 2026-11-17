@@ -5,7 +5,7 @@ import { Avviso, Badge, Card, Titolo, bottone, bottoneSecondario, campo, etichet
 import { richiediStaff } from "@/lib/sessione";
 import { data as formattaData, euro, nomeMetodo, oggiItalia } from "@/lib/formato";
 import { SELECT_PAGAMENTO, numeroRicevuta, type Pagamento } from "@/lib/pagamenti";
-import { annullaPagamento, registraPagamento, salvaIntestazione } from "./actions";
+import { annullaPagamento, registraPagamento, salvaIntestazione, verificaPagamento } from "./actions";
 
 const MESE = /^\d{4}-\d{2}$/;
 
@@ -26,7 +26,8 @@ export default async function PagamentiPage({ searchParams }: { searchParams: Se
   const mese = MESE.test(scelto) ? scelto : oggi.slice(0, 7);
   const lim = limitiMese(mese);
 
-  const [pagRes, clientiRes, corsiRes, impRes] = await Promise.all([
+  const admin = profilo.ruolo === "admin";
+  const [pagRes, clientiRes, corsiRes, impRes, attesaRes] = await Promise.all([
     supabase
       .from("pagamenti")
       .select(SELECT_PAGAMENTO)
@@ -37,7 +38,10 @@ export default async function PagamentiPage({ searchParams }: { searchParams: Se
     supabase.from("profili").select("id, nome, cognome").eq("ruolo", "utente").eq("attivo", true).order("cognome"),
     supabase.from("corsi").select("nome, prezzo_ingresso").eq("attivo", true).order("nome"),
     supabase.from("impostazioni").select("chiave, valore").in("chiave", ["ricevuta_intestazione", "ricevuta_piede"]),
+    // Da verificare: di qualsiasi mese
+    supabase.from("pagamenti").select(SELECT_PAGAMENTO).eq("verificato", false).eq("annullato", false).order("creato_il"),
   ]);
+  const daVerificare = (attesaRes.data ?? []) as unknown as Pagamento[];
   const pagamenti = (pagRes.data ?? []) as unknown as Pagamento[];
   const clienti = (clientiRes.data ?? []) as { id: string; nome: string; cognome: string }[];
   const corsi = (corsiRes.data ?? []) as { nome: string; prezzo_ingresso: number | null }[];
@@ -56,6 +60,51 @@ export default async function PagamentiPage({ searchParams }: { searchParams: Se
 
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
         <div className="space-y-6">
+          {/* ---------- Da verificare ---------- */}
+          {daVerificare.length > 0 && (
+            <Card className="border-corsia">
+              <h2 className="mb-1 font-semibold">
+                🔎 Pagamenti da verificare <Badge tono="attenzione">{daVerificare.length}</Badge>
+              </h2>
+              <p className="mb-3 text-sm text-slate-600">
+                {admin
+                  ? "Registrati dallo staff: controlla che i soldi ci siano (cassa, POS, conto) e conferma. Solo dopo l'abbonamento risulta pagato."
+                  : "Registrati in reception: l'admin li deve confermare prima che l'abbonamento risulti pagato."}
+              </p>
+              <ul className="divide-y divide-slate-100 text-sm">
+                {daVerificare.map((p) => (
+                  <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                    <span>
+                      <strong>{p.intestatario}</strong> · {euro(p.importo)} · {nomeMetodo(p.metodo)}
+                      <span className="block text-xs text-slate-500">
+                        {p.descrizione} · {formattaData(p.pagato_il)} · n. {numeroRicevuta(p)}
+                      </span>
+                    </span>
+                    {admin && (
+                      <span className="flex flex-wrap gap-2">
+                        <form action={verificaPagamento}>
+                          <input type="hidden" name="id" value={p.id} />
+                          <input type="hidden" name="torna" value={torna} />
+                          <BottoneInvio className={bottone}>✓ Verifica</BottoneInvio>
+                        </form>
+                        <details>
+                          <summary className="cursor-pointer py-2 text-xs text-slate-500 underline">Non va bene</summary>
+                          <form action={verificaPagamento} className="mt-2 flex gap-2">
+                            <input type="hidden" name="id" value={p.id} />
+                            <input type="hidden" name="torna" value={torna} />
+                            <input type="hidden" name="esito" value="rifiuta" />
+                            <input name="motivo" required placeholder="Perché? (es. non in cassa)" className={campo} />
+                            <BottoneInvio className={bottoneSecondario}>Rifiuta</BottoneInvio>
+                          </form>
+                        </details>
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
           {/* ---------- Mese ---------- */}
           <Card>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -108,6 +157,7 @@ export default async function PagamentiPage({ searchParams }: { searchParams: Se
                       <div className="flex flex-col items-end gap-1">
                         <span className={`text-lg font-bold tabular-nums ${p.annullato ? "line-through" : ""}`}>{euro(p.importo)}</span>
                         {p.annullato && <Badge>annullata</Badge>}
+                        {!p.annullato && !p.verificato && <Badge>in verifica</Badge>}
                       </div>
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-2">

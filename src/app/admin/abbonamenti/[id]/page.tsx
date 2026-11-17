@@ -7,9 +7,10 @@ import { BottoneWhatsApp, testiWhatsApp } from "@/components/WhatsApp";
 import { Avviso, Badge, Card, Titolo, bottone, bottoneSecondario, campo, etichetta, parametro, type SearchParams } from "@/components/ui";
 import { richiediStaff } from "@/lib/sessione";
 import { data as formattaData, euro, nomeGiorno, nomeMetodo, oggiItalia, ora } from "@/lib/formato";
-import { SELECT_PAGAMENTO, numeroRicevuta, type Pagamento } from "@/lib/pagamenti";
-import { cambiaGiorno, cambiaPagato } from "../actions";
-import { annullaPagamento, registraPagamento, salvaPrezzo } from "../../pagamenti/actions";
+import { SELECT_PAGAMENTO, numeroRicevuta, statoPagamento, type Pagamento } from "@/lib/pagamenti";
+import { cambiaGiorno } from "../actions";
+import { annullaPagamento, registraPagamento, salvaPrezzo, verificaPagamento } from "../../pagamenti/actions";
+import { BadgePagamento } from "@/components/BadgePagamento";
 
 type Orario = { id: string; corso_id: string; giorno_settimana: number; ora_inizio: string; corsi: { nome: string } | null };
 type Abbonamento = {
@@ -32,8 +33,9 @@ export default async function SchedaAbbonamento({
   params: Promise<{ id: string }>;
   searchParams: SearchParams;
 }) {
-  const { supabase } = await richiediStaff();
+  const { supabase, profilo } = await richiediStaff();
   const { id } = await params;
+  const admin = profilo.ruolo === "admin";
   const sp = await searchParams;
 
   const [abbRes, orariRes, richiesteRes, pagRes] = await Promise.all([
@@ -62,9 +64,7 @@ export default async function SchedaAbbonamento({
   const alternative = orari.filter((o) => o.corso_id === miei[0]?.corso_id && !mieiId.has(o.id));
   const scaduto = a.data_fine < new Date().toISOString().slice(0, 10);
   const pagina = `/admin/abbonamenti/${a.id}`;
-  const prezzo = a.prezzo === null ? null : Number(a.prezzo);
-  const versato = pagamenti.filter((p) => !p.annullato).reduce((t, p) => t + Number(p.importo), 0);
-  const residuo = prezzo === null ? null : Math.max(0, Math.round((prezzo - versato) * 100) / 100);
+  const { stato, verificato, inAttesa, prezzo, residuo } = statoPagamento({ ...a, pagamenti });
 
   return (
     <>
@@ -84,19 +84,17 @@ export default async function SchedaAbbonamento({
             </div>
             <div className="flex flex-col items-end gap-1">
               {scaduto && <Badge>scaduto</Badge>}
-              <Badge tono={a.pagato ? "ok" : "attenzione"}>{a.pagato ? "pagato" : "da pagare"}</Badge>
+              <BadgePagamento stato={stato} />
             </div>
           </div>
           {a.note && <p className="mt-3 text-sm italic text-slate-600">{a.note}</p>}
           <div className="mt-4 flex flex-wrap gap-2">
-            <form action={cambiaPagato}>
-              <input type="hidden" name="id" value={a.id} />
-              <input type="hidden" name="pagato" value={a.pagato ? "no" : "si"} />
-              <BottoneInvio className={bottoneSecondario} title="Senza registrare un pagamento né fare la ricevuta">
-                {a.pagato ? "Segna come non pagato" : "Segna come pagato (senza ricevuta)"}
-              </BottoneInvio>
-            </form>
-            {!a.pagato && <BottoneWhatsApp telefono={a.profili?.telefono} testo={testiWhatsApp.pagamento(a.profili?.nome ?? "", a.tipo)} />}
+            {(stato === "da_pagare" || stato === "acconto") && (
+              <a href="#pagamento" className={bottone}>
+                💶 Registra pagamento
+              </a>
+            )}
+            {(stato === "da_pagare" || stato === "acconto") && <BottoneWhatsApp telefono={a.profili?.telefono} testo={testiWhatsApp.pagamento(a.profili?.nome ?? "", a.tipo)} />}
             <Link href={`/admin/utenti/${a.utente_id}`} className={bottoneSecondario}>
               Scheda cliente
             </Link>
@@ -120,17 +118,22 @@ export default async function SchedaAbbonamento({
             <div>
               <h2 className="font-semibold">Pagamenti</h2>
               <p className="text-sm text-slate-600">
-                Versato <strong>{euro(versato)}</strong>
-                {prezzo !== null && (
+                {prezzo !== null && <>Prezzo {euro(prezzo)} · </>}
+                verificato <strong>{euro(verificato)}</strong>
+                {inAttesa > 0 && (
                   <>
-                    {" "}su {euro(prezzo)}
-                    {(residuo ?? 0) > 0 ? (
-                      <> · mancano <strong className="text-amber-800">{euro(residuo)}</strong></>
-                    ) : (
-                      " · saldato ✓"
-                    )}
+                    {" "}· in verifica <strong>{euro(inAttesa)}</strong>
                   </>
                 )}
+                {(residuo ?? 0) > 0 && (
+                  <>
+                    {" "}· mancano <strong className="text-amber-800">{euro(residuo)}</strong>
+                  </>
+                )}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Diventa &quot;pagato&quot; da solo quando i pagamenti verificati coprono il prezzo. Quelli registrati dallo staff li verifica
+                l&apos;admin.
               </p>
             </div>
             <form action={salvaPrezzo} className="flex items-end gap-2">
@@ -150,6 +153,11 @@ export default async function SchedaAbbonamento({
                   <span>
                     <strong className={`tabular-nums ${p.annullato ? "line-through" : ""}`}>{euro(p.importo)}</strong> · {nomeMetodo(p.metodo)} ·{" "}
                     {formattaData(p.pagato_il)}
+                    {!p.annullato && !p.verificato && (
+                      <span className="ml-2">
+                        <Badge>in verifica</Badge>
+                      </span>
+                    )}
                     <span className="block text-xs text-slate-500">
                       Ricevuta n. {numeroRicevuta(p)}
                       {p.note ? ` · ${p.note}` : ""}
@@ -158,7 +166,14 @@ export default async function SchedaAbbonamento({
                   </span>
                   <span className="flex flex-wrap items-center gap-2">
                     <Link href={`/ricevuta/${p.id}?torna=${encodeURIComponent(pagina)}`} className={bottoneSecondario}>🧾 Ricevuta</Link>
-                    {!p.annullato && (
+                    {admin && !p.annullato && !p.verificato && (
+                      <form action={verificaPagamento}>
+                        <input type="hidden" name="id" value={p.id} />
+                        <input type="hidden" name="torna" value={pagina} />
+                        <BottoneInvio className={bottone}>✓ Verifica</BottoneInvio>
+                      </form>
+                    )}
+                    {!p.annullato && (admin || !p.verificato) && (
                       <details>
                         <summary className="cursor-pointer text-xs text-slate-500 underline">Annulla</summary>
                         <form action={annullaPagamento} className="mt-2 flex gap-2">
@@ -175,7 +190,7 @@ export default async function SchedaAbbonamento({
             </ul>
           )}
 
-          <details open={!a.pagato} className="rounded-xl bg-schiuma p-4">
+          <details id="pagamento" open={stato === "da_pagare" || stato === "acconto"} className="scroll-mt-24 rounded-xl bg-schiuma p-4">
             <summary className="cursor-pointer font-medium">💶 Registra un pagamento</summary>
             <form action={registraPagamento} className="mt-4 space-y-3">
               <input type="hidden" name="abbonamento_id" value={a.id} />

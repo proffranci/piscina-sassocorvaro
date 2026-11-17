@@ -36,7 +36,7 @@ export async function creaAbbonamento(formData: FormData) {
   if (!utenteId || !tipo) errore(pagina, "Scegli il cliente e scrivi il tipo di abbonamento.");
   if (!DATA.test(dataInizio) || !DATA.test(dataFine)) errore(pagina, "Date non valide.");
   if (dataFine < dataInizio) errore(pagina, "La data di fine viene prima di quella di inizio.");
-  if (prezzoScritto && prezzo === null) errore(pagina, "Prezzo non valido.");
+  if (prezzo === null) errore(pagina, "Scrivi il prezzo dell'abbonamento: serve per sapere quando è saldato.");
   if (pagamento && "errore" in pagamento) errore(pagina, pagamento.errore);
   if (orariScelti.length !== quanti) {
     errore(pagina, `Per ${corso.nome} devi scegliere ${quanti === 1 ? "1 orario" : `${quanti} orari`} settimanali (ora: ${orariScelti.length}).`);
@@ -56,7 +56,7 @@ export async function creaAbbonamento(formData: FormData) {
 
   const { data: nuovo, error } = await supabase
     .from("abbonamenti")
-    .insert({ utente_id: utenteId, tipo, data_inizio: dataInizio, data_fine: dataFine, note, prezzo, pagato: false })
+    .insert({ utente_id: utenteId, tipo, data_inizio: dataInizio, data_fine: dataFine, note, prezzo })
     .select("id")
     .single();
   if (error || !nuovo) errore(pagina, "Non sono riuscito a salvare l'abbonamento.");
@@ -95,16 +95,6 @@ export async function creaAbbonamento(formData: FormData) {
   }
 
   redirect(`/admin/abbonamenti/${nuovo.id}?ok=${encodeURIComponent(messaggio)}`);
-}
-
-export async function cambiaPagato(formData: FormData) {
-  const { supabase } = await richiediStaff();
-  const { error } = await supabase
-    .from("abbonamenti")
-    .update({ pagato: testo(formData, "pagato") === "si" })
-    .eq("id", testo(formData, "id"));
-  if (error) errore("/admin/abbonamenti", "Modifica non riuscita.");
-  redirect(`/admin/abbonamenti?ok=${encodeURIComponent("Pagamento aggiornato.")}`);
 }
 
 const RITORNI_CAMBIO = ["/admin", "/admin/abbonamenti"];
