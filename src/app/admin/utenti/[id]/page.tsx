@@ -4,13 +4,15 @@ import { BottoneInvio } from "@/components/BottoneInvio";
 import { BottoneWhatsApp } from "@/components/WhatsApp";
 import { Avviso, Badge, Card, Titolo, bottone, bottoneSecondario, campo, etichetta, parametro, type SearchParams } from "@/components/ui";
 import { richiediStaff, type Profilo } from "@/lib/sessione";
-import { data as formattaData, etichettaGiorno, euro, nomeMetodo, oraDi } from "@/lib/formato";
-import { SELECT_PAGAMENTO, numeroRicevuta, type Pagamento } from "@/lib/pagamenti";
+import { METODI_PAGAMENTO, data as formattaData, etichettaGiorno, euro, nomeMetodo, oraDi } from "@/lib/formato";
+import { SELECT_PAGAMENTO, SELECT_PAGAMENTI_ABB, numeroRicevuta, statoPagamento, type PagamentoBreve, type Pagamento } from "@/lib/pagamenti";
+import { BadgePagamento } from "@/components/BadgePagamento";
+import { registraPagamento, verificaPagamento } from "../../pagamenti/actions";
 import { aggiornaUtente, cambiaAttivo, cambiaNomeUtente, eliminaUtente } from "../actions";
 import { assegnaTessera, ingressoManuale, rigeneraQrUtente } from "../../ingresso/actions";
 import { ReimpostaPassword } from "./ReimpostaPassword";
 
-type Abb = { id: string; tipo: string; data_inizio: string; data_fine: string; pagato: boolean };
+type Abb = { id: string; tipo: string; data_inizio: string; data_fine: string; pagato: boolean; prezzo: number | string | null; pagamenti: PagamentoBreve[] };
 type Attivita = { id: number; creata_il: string; descrizione: string };
 
 export default async function SchedaUtente({
@@ -26,7 +28,7 @@ export default async function SchedaUtente({
 
   const [utenteRes, abbRes, attRes, pagRes] = await Promise.all([
     supabase.from("profili").select("*").eq("id", id).maybeSingle(),
-    supabase.from("abbonamenti").select("id, tipo, data_inizio, data_fine, pagato").eq("utente_id", id).order("data_fine", { ascending: false }),
+    supabase.from("abbonamenti").select(`id, tipo, data_inizio, data_fine, pagato, prezzo, ${SELECT_PAGAMENTI_ABB}`).eq("utente_id", id).order("data_fine", { ascending: false }),
     supabase.from("attivita").select("id, creata_il, descrizione").eq("utente_id", id).order("creata_il", { ascending: false }).limit(15),
     supabase.from("pagamenti").select(SELECT_PAGAMENTO).eq("utente_id", id).order("pagato_il", { ascending: false }).limit(20),
   ]);
@@ -181,22 +183,62 @@ export default async function SchedaUtente({
               <p className="text-sm text-slate-500">Nessun abbonamento.</p>
             ) : (
               <ul className="divide-y divide-slate-100 text-sm">
-                {abbonamenti.map((a) => (
-                  <li key={a.id}>
-                    <Link href={`/admin/abbonamenti/${a.id}`} className="flex items-center justify-between gap-2 py-2 hover:bg-schiuma/50">
-                      <span>
-                        <strong>{a.tipo}</strong>
-                        <span className="block text-xs text-slate-500">
-                          {formattaData(a.data_inizio)} → {formattaData(a.data_fine)}
+                {abbonamenti.map((a) => {
+                  const sp = statoPagamento(a);
+                  const daSaldare = sp.stato === "da_pagare" || sp.stato === "acconto";
+                  return (
+                    <li key={a.id} className="py-2">
+                      <Link href={`/admin/abbonamenti/${a.id}`} className="flex items-center justify-between gap-2 hover:bg-schiuma/50">
+                        <span>
+                          <strong>{a.tipo}</strong>
+                          <span className="block text-xs text-slate-500">
+                            {formattaData(a.data_inizio)} → {formattaData(a.data_fine)}
+                            {sp.prezzo !== null && ` · ${euro(sp.prezzo)}`}
+                            {sp.residuo ? ` · mancano ${euro(sp.residuo)}` : ""}
+                          </span>
                         </span>
-                      </span>
-                      <span className="flex gap-1">
-                        {a.data_fine < oggi && <Badge>scaduto</Badge>}
-                        <Badge tono={a.pagato ? "ok" : "attenzione"}>{a.pagato ? "pagato" : "da pagare"}</Badge>
-                      </span>
-                    </Link>
-                  </li>
-                ))}
+                        <span className="flex gap-1">
+                          {a.data_fine < oggi && <Badge>scaduto</Badge>}
+                          <BadgePagamento stato={sp.stato} />
+                        </span>
+                      </Link>
+                      {/* "Ha saldato": un clic, poi l'admin verifica */}
+                      {daSaldare && (
+                        <form action={registraPagamento} className="mt-2 flex flex-wrap items-end gap-2 rounded-xl bg-schiuma p-2">
+                          <input type="hidden" name="abbonamento_id" value={a.id} />
+                          <input type="hidden" name="torna" value={`/admin/utenti/${u.id}`} />
+                          <input type="hidden" name="resta" value="1" />
+                          <label className="text-xs text-slate-600">
+                            Importo €
+                            <input
+                              name="importo"
+                              inputMode="decimal"
+                              required
+                              defaultValue={sp.residuo ? String(sp.residuo).replace(".", ",") : ""}
+                              className={`${campo} w-28`}
+                            />
+                          </label>
+                          <label className="text-xs text-slate-600">
+                            Modalità
+                            <select name="metodo" defaultValue="contanti" className={`${campo} w-36`}>
+                              {METODI_PAGAMENTO.map((m) => (
+                                <option key={m.valore} value={m.valore}>
+                                  {m.testo}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <BottoneInvio className={bottone}>{sp.stato === "acconto" ? "Ha saldato il resto" : "Ha saldato"}</BottoneInvio>
+                        </form>
+                      )}
+                      {sp.stato === "in_verifica" && (
+                        <p className="mt-1 text-xs text-slate-500">
+                          {euro(sp.inAttesa)} registrati: diventa &quot;pagato&quot; quando l&apos;admin verifica.
+                        </p>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </Card>
@@ -220,8 +262,18 @@ export default async function SchedaUtente({
                           n. {numeroRicevuta(p)} · {formattaData(p.pagato_il)} · {nomeMetodo(p.metodo)}
                         </span>
                       </span>
-                      <span className={`font-semibold tabular-nums ${p.annullato ? "line-through" : ""}`}>{euro(p.importo)}</span>
+                      <span className="flex items-center gap-2">
+                        {!p.annullato && !p.verificato && <Badge>in verifica</Badge>}
+                        <span className={`font-semibold tabular-nums ${p.annullato ? "line-through" : ""}`}>{euro(p.importo)}</span>
+                      </span>
                     </Link>
+                    {io.ruolo === "admin" && !p.annullato && !p.verificato && (
+                      <form action={verificaPagamento} className="pb-2">
+                        <input type="hidden" name="id" value={p.id} />
+                        <input type="hidden" name="torna" value={`/admin/utenti/${u.id}`} />
+                        <BottoneInvio className={bottone}>✓ Verifica pagamento</BottoneInvio>
+                      </form>
+                    )}
                   </li>
                 ))}
               </ul>

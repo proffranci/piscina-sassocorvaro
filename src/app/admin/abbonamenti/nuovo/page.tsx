@@ -129,10 +129,11 @@ export default async function NuovoAbbonamentoPage({ searchParams }: { searchPar
                 <textarea id="note" name="note" rows={2} className={campo} />
               </div>
               <div>
-                <label className={etichetta} htmlFor="prezzo">Prezzo concordato (€, facoltativo)</label>
+                <label className={etichetta} htmlFor="prezzo">Prezzo (€)</label>
                 <input
                   id="prezzo"
                   name="prezzo"
+                  required
                   inputMode="decimal"
                   defaultValue={corso.prezzo_abbonamento !== null ? String(corso.prezzo_abbonamento).replace(".", ",") : ""}
                   placeholder="Es. 120,00"

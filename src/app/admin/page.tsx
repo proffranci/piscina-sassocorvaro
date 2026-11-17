@@ -2,6 +2,7 @@ import { confermaIngresso } from "./lezioni/actions";
 import { RichiestaCambio, SELECT_RICHIESTE, type RichiestaStaff } from "@/components/RichiestaCambio";
 import { BottoneWhatsApp, testiWhatsApp } from "@/components/WhatsApp";
 import Link from "next/link";
+import { SELECT_PAGAMENTI_ABB, statoPagamento, type PagamentoBreve } from "@/lib/pagamenti";
 import type { ReactNode } from "react";
 import { BottoneInvio } from "@/components/BottoneInvio";
 import { Avviso, Badge, Card, Titolo, bottoneSecondario, parametro, type SearchParams } from "@/components/ui";
@@ -25,6 +26,8 @@ type Abb = {
   tipo: string;
   data_fine: string;
   pagato: boolean;
+  prezzo?: number | string | null;
+  pagamenti?: PagamentoBreve[];
   profili: { nome: string; cognome: string; telefono: string | null } | null;
 };
 
@@ -92,7 +95,7 @@ export default async function OggiPage({ searchParams }: { searchParams: SearchP
   const fineGiorno = new Date(adesso.getTime() + 36 * 3_600_000).toISOString();
 
   // Tutte le richieste partono insieme: una sola attesa invece di cinque
-  const [lezRes, daPagareRes, inScadRes, scadutiRes, cronoRes, richiesteRes, ingressiRes] = await Promise.all([
+  const [lezRes, daPagareRes, inScadRes, scadutiRes, cronoRes, richiesteRes, ingressiRes, verificaRes] = await Promise.all([
     supabase
       .from("lezioni")
       .select("id, inizio, capienza, scadenza_conferma, annullata, corsi(nome), prenotazioni(stato, tipo)")
@@ -101,7 +104,7 @@ export default async function OggiPage({ searchParams }: { searchParams: SearchP
       .order("inizio"),
     supabase
       .from("abbonamenti")
-      .select("id, tipo, data_fine, pagato, profili(nome, cognome, telefono)")
+      .select(`id, tipo, data_fine, pagato, prezzo, ${SELECT_PAGAMENTI_ABB}, profili(nome, cognome, telefono)`)
       .eq("pagato", false)
       .gte("data_fine", oggiData)
       .order("data_fine"),
@@ -125,7 +128,9 @@ export default async function OggiPage({ searchParams }: { searchParams: SearchP
       .eq("da_confermare_staff", true)
       .eq("stato", "confermata")
       .gte("lezioni.inizio", adesso.toISOString()),
+    supabase.from("pagamenti").select("id", { count: "exact", head: true }).eq("verificato", false).eq("annullato", false),
   ]);
+  const daVerificare = verificaRes.count ?? 0;
   const ingressiDaConfermare = ((ingressiRes.data ?? []) as unknown as IngressoDaConfermare[]).sort((a, b) =>
     a.lezioni.inizio.localeCompare(b.lezioni.inizio),
   );
@@ -134,7 +139,8 @@ export default async function OggiPage({ searchParams }: { searchParams: SearchP
   const lezioni = ((lezRes.data ?? []) as unknown as LezioneOggi[]).filter(
     (l) => giornoChiave(l.inizio) === oggi && !l.annullata,
   );
-  const daPagare = (daPagareRes.data ?? []) as unknown as Abb[];
+  // Chi ha già pagato in reception (in attesa di verifica) non va sollecitato
+  const daPagare = ((daPagareRes.data ?? []) as unknown as Abb[]).filter((a) => statoPagamento(a).stato !== "in_verifica");
   const inScadenza = (inScadRes.data ?? []) as unknown as Abb[];
   const scaduti = (scadutiRes.data ?? []) as unknown as Abb[];
   const cronologia = (cronoRes.data ?? []) as unknown as Attivita[];
@@ -223,6 +229,17 @@ export default async function OggiPage({ searchParams }: { searchParams: SearchP
           </ul>
           <Link href="/admin/avvisi" className={`${bottoneSecondario} mt-3 w-full`}>
             🔔 Ricorda di confermare (app o WhatsApp)
+          </Link>
+        </Controllo>
+
+        {/* 2a. Pagamenti registrati dallo staff, da confermare */}
+        <Controllo titolo="Pagamenti da verificare" numero={daVerificare} vuoto="Nessun pagamento in attesa di verifica.">
+          <p className="mb-3 text-sm text-slate-600">
+            {daVerificare === 1 ? "1 pagamento registrato" : `${daVerificare} pagamenti registrati`} in reception aspetta la conferma
+            dell&apos;admin.
+          </p>
+          <Link href="/admin/pagamenti" className={`${bottoneSecondario} w-full`}>
+            🔎 Apri e verifica
           </Link>
         </Controllo>
 

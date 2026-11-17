@@ -2,8 +2,9 @@ import { BottoneWhatsApp, testiWhatsApp } from "@/components/WhatsApp";
 import Link from "next/link";
 import { Avviso, Badge, Card, Titolo, bottone, bottoneSecondario, parametro, type SearchParams } from "@/components/ui";
 import { richiediStaff } from "@/lib/sessione";
-import { data as formattaData, nomeGiorno, ora } from "@/lib/formato";
-import { cambiaPagato } from "./actions";
+import { data as formattaData, euro, nomeGiorno, ora } from "@/lib/formato";
+import { BadgePagamento } from "@/components/BadgePagamento";
+import { SELECT_PAGAMENTI_ABB, statoPagamento, type PagamentoBreve } from "@/lib/pagamenti";
 import { sollecitaPagamento } from "../avvisi/actions";
 import { BottoneInvio } from "@/components/BottoneInvio";
 
@@ -13,6 +14,8 @@ type Riga = {
   data_inizio: string;
   data_fine: string;
   pagato: boolean;
+  prezzo: number | string | null;
+  pagamenti: PagamentoBreve[];
   note: string | null;
   profili: { nome: string; cognome: string; email: string | null; telefono: string | null } | null;
   abbonamenti_orari: {
@@ -29,7 +32,7 @@ export default async function AbbonamentiPage({ searchParams }: { searchParams: 
   let query = supabase
     .from("abbonamenti")
     .select(
-      "id, tipo, data_inizio, data_fine, pagato, note, profili(nome, cognome, email, telefono), abbonamenti_orari(orari_corso(giorno_settimana, ora_inizio, corsi(nome)))",
+      `id, tipo, data_inizio, data_fine, pagato, prezzo, note, ${SELECT_PAGAMENTI_ABB}, profili(nome, cognome, email, telefono), abbonamenti_orari(orari_corso(giorno_settimana, ora_inizio, corsi(nome)))`,
     )
     .order("data_fine", { ascending: true });
   if (!mostraScaduti) query = query.gte("data_fine", oggi);
@@ -68,6 +71,8 @@ export default async function AbbonamentiPage({ searchParams }: { searchParams: 
       <div className="grid gap-4 md:grid-cols-2">
         {abbonamenti.map((a) => {
           const scaduto = a.data_fine < oggi;
+          const { stato, residuo } = statoPagamento(a);
+          const daIncassare = !scaduto && (stato === "da_pagare" || stato === "acconto");
           const orari = a.abbonamenti_orari
             .map((x) => x.orari_corso)
             .filter((o): o is NonNullable<typeof o> => !!o)
@@ -83,7 +88,7 @@ export default async function AbbonamentiPage({ searchParams }: { searchParams: 
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   {scaduto && <Badge>scaduto</Badge>}
-                  <Badge tono={a.pagato ? "ok" : "attenzione"}>{a.pagato ? "pagato" : "da pagare"}</Badge>
+                  <BadgePagamento stato={stato} />
                 </div>
               </div>
 
@@ -102,19 +107,19 @@ export default async function AbbonamentiPage({ searchParams }: { searchParams: 
               {a.note && <p className="mt-3 text-sm italic text-slate-600">{a.note}</p>}
 
               <div className="mt-4 flex flex-wrap gap-2">
-                <form action={cambiaPagato}>
-                  <input type="hidden" name="id" value={a.id} />
-                  <input type="hidden" name="pagato" value={a.pagato ? "no" : "si"} />
-                  <BottoneInvio className={bottoneSecondario}>{a.pagato ? "Segna come non pagato" : "Segna come pagato"}</BottoneInvio>
-                </form>
-                {!a.pagato && !scaduto && (
+                {daIncassare && (
+                  <Link href={`/admin/abbonamenti/${a.id}#pagamento`} className={bottone}>
+                    💶 Registra pagamento{residuo ? ` (${euro(residuo)})` : ""}
+                  </Link>
+                )}
+                {daIncassare && (
                   <form action={sollecitaPagamento}>
                     <input type="hidden" name="abbonamento_id" value={a.id} />
                     <input type="hidden" name="torna" value="/admin/abbonamenti" />
-                    <BottoneInvio className={bottoneSecondario}>🔔 Sollecita pagamento</BottoneInvio>
+                    <BottoneInvio className={bottoneSecondario}>🔔 Sollecita</BottoneInvio>
                   </form>
                 )}
-                {!a.pagato && !scaduto && (
+                {daIncassare && (
                   <BottoneWhatsApp telefono={a.profili?.telefono} testo={testiWhatsApp.pagamento(a.profili?.nome ?? "", a.tipo)} />
                 )}
               </div>

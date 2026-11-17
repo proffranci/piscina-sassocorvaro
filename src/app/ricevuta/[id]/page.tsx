@@ -42,6 +42,7 @@ export default async function RicevutaPage({ params, searchParams }: { params: P
       {parametro(sp.nuova) === "1" && (
         <p className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 print:hidden">
           Pagamento registrato. Stampa la ricevuta o salvala in PDF per mandarla al cliente.
+          {!p.verificato && !p.annullato && " L'abbonamento risulterà pagato quando l'admin avrà verificato l'incasso."}
         </p>
       )}
 
