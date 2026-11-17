@@ -16,6 +16,7 @@ type Prenotazione = {
   nome_ospite: string | null;
   da_confermare_staff: boolean;
   confermata_il: string | null;
+  entrato_il: string | null;
   profili: { nome: string; cognome: string; telefono: string | null; email: string | null } | null;
 };
 
@@ -53,7 +54,7 @@ export default async function LezionePage({
     supabase
       .from("lezioni")
       .select(
-        "id, inizio, fine, capienza, scadenza_conferma, annullata, personalizzata, motivo_annullamento, orario_corso_id, corsi(nome), prenotazioni(id, stato, tipo, nome_ospite, confermata_il, da_confermare_staff, profili(nome, cognome, telefono, email))",
+        "id, inizio, fine, capienza, scadenza_conferma, annullata, personalizzata, motivo_annullamento, orario_corso_id, corsi(nome), prenotazioni(id, stato, tipo, nome_ospite, confermata_il, entrato_il, da_confermare_staff, profili(nome, cognome, telefono, email))",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -150,6 +151,11 @@ export default async function LezionePage({
                     <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
                       <span>
                         <span className="font-medium">{nomeDi(p)}</span>
+                        {p.entrato_il && (
+                          <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
+                            🚪 entrato {oraDi(p.entrato_il)}
+                          </span>
+                        )}
                         {p.da_confermare_staff && p.stato === "confermata" && (
                           <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-amber-200">
                             da confermare

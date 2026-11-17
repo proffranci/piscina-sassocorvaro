@@ -14,6 +14,9 @@ src/lib/sessione.ts    "chi è entrato?" e i controlli staff/admin
 src/app/login          pagina di accesso
 src/app/admin          area di gestione (staff e admin)
 src/app/admin/lezioni  dettaglio di una lezione: conferme, posti, ingressi dalla reception
+src/app/admin/ingresso lettore degli ingressi (fotocamera, lettore USB, NFC)
+src/app/admin/pagamenti pagamenti del mese, nuova ricevuta, export CSV
+src/app/ricevuta       la ricevuta da stampare (staff e cliente)
 src/app/area           area del cliente
 ```
 
@@ -33,6 +36,8 @@ src/app/area           area del cliente
 - Ogni pagina e azione admin controlla lato server che l'utente sia staff (`richiediStaff`).
 - La Row Level Security nel database fa da seconda barriera: un cliente vede solo i propri dati.
 - Solo un admin può cambiare i ruoli (trigger `proteggi_ruolo`).
+- Le ricevute si scrivono solo con le funzioni `registra_pagamento` / `annulla_pagamento`: numerazione senza buchi né doppioni.
+- Il QR contiene solo un codice casuale (nessun dato personale); se viene perso o condiviso si rigenera e il vecchio smette di funzionare.
 
 ## Fasi
 
@@ -43,6 +48,12 @@ src/app/area           area del cliente
 - [x] **Novità per lo staff** – campanella con numerino per ogni operazione dei clienti, push anche allo staff, diagnosi delle consegne
 - [x] **Account e cambi giorno** – nome utente unico, scheda utente, password temporanea, cambio password obbligatorio, richieste di cambio giorno
 - [x] **Corsi configurabili e Nuoto libero** – scadenza di conferma per corso/orario, orari in blocco, lezioni modificabili e annullabili, Nuoto libero con abbonamenti
+- [x] **Corsi su misura, eliminazioni, pagamenti, ingresso con QR** (script `0013`):
+  - orario limite per confermare: il giorno stesso, N giorni prima, N ore prima oppure "nessuna conferma"; limite per disdire; regole degli ingressi singoli (dall'app sì/no, subito o solo dopo l'orario limite, giorni di anticipo); prezzi; durata predefinita; sospensione del corso
+  - nuovo corso con tutte le impostazioni e i primi orari in un solo modulo
+  - eliminare orari, corsi (admin) e account (con conferma scritta)
+  - pagamenti con data, modalità e importo, acconti, ricevuta numerata (n/anno) stampabile o in PDF, annullo con motivo, export CSV del mese
+  - ingresso: QR personale nell'app (Tessera), tessera stampabile, tessere/braccialetti RFID-NFC; la reception legge con la fotocamera, con un lettore USB o con l'NFC del telefono Android e vede subito verde/giallo/rosso
 - [ ] **Email** – promemoria anche via email
 - [ ] **Fase 3** – prenotazione corsie
 - [ ] **Fase 4** – WhatsApp, report, rifiniture grafiche

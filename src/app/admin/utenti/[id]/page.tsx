@@ -4,8 +4,10 @@ import { BottoneInvio } from "@/components/BottoneInvio";
 import { BottoneWhatsApp } from "@/components/WhatsApp";
 import { Avviso, Badge, Card, Titolo, bottone, bottoneSecondario, campo, etichetta, parametro, type SearchParams } from "@/components/ui";
 import { richiediStaff, type Profilo } from "@/lib/sessione";
-import { data as formattaData, etichettaGiorno, oraDi } from "@/lib/formato";
-import { aggiornaUtente, cambiaAttivo, cambiaNomeUtente } from "../actions";
+import { data as formattaData, etichettaGiorno, euro, nomeMetodo, oraDi } from "@/lib/formato";
+import { SELECT_PAGAMENTO, numeroRicevuta, type Pagamento } from "@/lib/pagamenti";
+import { aggiornaUtente, cambiaAttivo, cambiaNomeUtente, eliminaUtente } from "../actions";
+import { assegnaTessera, ingressoManuale, rigeneraQrUtente } from "../../ingresso/actions";
 import { ReimpostaPassword } from "./ReimpostaPassword";
 
 type Abb = { id: string; tipo: string; data_inizio: string; data_fine: string; pagato: boolean };
@@ -22,11 +24,13 @@ export default async function SchedaUtente({
   const { id } = await params;
   const sp = await searchParams;
 
-  const [utenteRes, abbRes, attRes] = await Promise.all([
+  const [utenteRes, abbRes, attRes, pagRes] = await Promise.all([
     supabase.from("profili").select("*").eq("id", id).maybeSingle(),
     supabase.from("abbonamenti").select("id, tipo, data_inizio, data_fine, pagato").eq("utente_id", id).order("data_fine", { ascending: false }),
     supabase.from("attivita").select("id, creata_il, descrizione").eq("utente_id", id).order("creata_il", { ascending: false }).limit(15),
+    supabase.from("pagamenti").select(SELECT_PAGAMENTO).eq("utente_id", id).order("pagato_il", { ascending: false }).limit(20),
   ]);
+  const pagamenti = (pagRes.data ?? []) as unknown as Pagamento[];
   const u = utenteRes.data as unknown as Profilo | null;
   if (!u) notFound();
   const abbonamenti = (abbRes.data ?? []) as unknown as Abb[];
@@ -123,6 +127,50 @@ export default async function SchedaUtente({
             </form>
           </Card>
 
+          {/* ---------- Ingresso: QR e tessera ---------- */}
+          {u.ruolo === "utente" && (
+            <Card>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="font-semibold">Ingresso</h2>
+                <Link href={`/admin/utenti/${u.id}/tessera`} className="text-sm text-vasca underline">
+                  🖨️ Stampa tessera con QR
+                </Link>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <form action={ingressoManuale} className="rounded-xl bg-schiuma p-3">
+                  <input type="hidden" name="utente_id" value={u.id} />
+                  <p className="mb-2 text-sm">Ha dimenticato QR e tessera?</p>
+                  <label className="mb-2 flex items-center gap-2 text-xs text-slate-600">
+                    <input type="checkbox" name="forza" /> Fallo entrare anche se non risulta valido
+                  </label>
+                  <BottoneInvio className={`${bottoneSecondario} w-full`}>🚪 Registra ingresso ora</BottoneInvio>
+                </form>
+                <form action={assegnaTessera} className="rounded-xl border border-slate-200 p-3">
+                  <input type="hidden" name="utente_id" value={u.id} />
+                  <label className="mb-1 block text-sm" htmlFor="tessera">
+                    Tessera / braccialetto RFID-NFC
+                  </label>
+                  <input
+                    id="tessera"
+                    name="tessera"
+                    defaultValue={u.tessera_rfid ?? ""}
+                    placeholder="Clicca qui e passa la tessera sul lettore"
+                    autoComplete="off"
+                    className={`${campo} font-mono`}
+                  />
+                  <p className="mt-1 text-xs text-slate-500">Usa lo stesso lettore della reception. Vuoto = scollega.</p>
+                  <BottoneInvio className={`${bottoneSecondario} mt-2 w-full`}>Salva tessera</BottoneInvio>
+                </form>
+              </div>
+              <form action={rigeneraQrUtente} className="mt-3">
+                <input type="hidden" name="utente_id" value={u.id} />
+                <BottoneInvio className="text-xs text-slate-500 underline" title="Il QR attuale smette di funzionare">
+                  QR perso o condiviso? Creane uno nuovo
+                </BottoneInvio>
+              </form>
+            </Card>
+          )}
+
           {/* ---------- Abbonamenti ---------- */}
           <Card>
             <div className="mb-3 flex items-center justify-between gap-2">
@@ -146,6 +194,33 @@ export default async function SchedaUtente({
                         {a.data_fine < oggi && <Badge>scaduto</Badge>}
                         <Badge tono={a.pagato ? "ok" : "attenzione"}>{a.pagato ? "pagato" : "da pagare"}</Badge>
                       </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+
+          {/* ---------- Pagamenti ---------- */}
+          <Card>
+            <h2 className="mb-3 font-semibold">Pagamenti</h2>
+            {pagamenti.length === 0 ? (
+              <p className="text-sm text-slate-500">Nessun pagamento registrato.</p>
+            ) : (
+              <ul className="divide-y divide-slate-100 text-sm">
+                {pagamenti.map((p) => (
+                  <li key={p.id}>
+                    <Link
+                      href={`/ricevuta/${p.id}?torna=${encodeURIComponent(`/admin/utenti/${u.id}`)}`}
+                      className={`flex items-center justify-between gap-2 py-2 hover:bg-schiuma/50 ${p.annullato ? "opacity-60" : ""}`}
+                    >
+                      <span>
+                        {p.descrizione}
+                        <span className="block text-xs text-slate-500">
+                          n. {numeroRicevuta(p)} · {formattaData(p.pagato_il)} · {nomeMetodo(p.metodo)}
+                        </span>
+                      </span>
+                      <span className={`font-semibold tabular-nums ${p.annullato ? "line-through" : ""}`}>{euro(p.importo)}</span>
                     </Link>
                   </li>
                 ))}
@@ -216,6 +291,33 @@ export default async function SchedaUtente({
                 <input type="hidden" name="torna" value="scheda" />
                 <BottoneInvio className={`${bottoneSecondario} w-full`}>
                   {u.attivo ? "Disattiva account" : "Riattiva account"}
+                </BottoneInvio>
+              </form>
+            </Card>
+
+            <Card className="border-red-200">
+              <h2 className="mb-1 font-semibold text-red-800">Elimina account</h2>
+              <p className="mb-3 text-sm text-slate-600">
+                Cancella per sempre accesso, abbonamenti, prenotazioni e avvisi. Le ricevute dei pagamenti restano, con il nome. Se
+                vuoi solo bloccarlo, usa &quot;Disattiva&quot;.
+              </p>
+              <form action={eliminaUtente} className="space-y-3">
+                <input type="hidden" name="id" value={u.id} />
+                <label className="block text-xs text-slate-600" htmlFor="conferma-elimina">
+                  Per conferma scrivi <strong className="font-mono">{u.nome_utente ?? `${u.nome} ${u.cognome}`.trim()}</strong>
+                </label>
+                <input
+                  id="conferma-elimina"
+                  name="conferma"
+                  required
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className={campo}
+                />
+                <BottoneInvio className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-red-700 px-4 text-sm font-semibold text-white hover:bg-red-800">
+                  Elimina definitivamente
                 </BottoneInvio>
               </form>
             </Card>

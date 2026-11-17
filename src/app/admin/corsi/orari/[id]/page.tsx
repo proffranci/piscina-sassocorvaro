@@ -5,7 +5,7 @@ import { CampiScadenza } from "@/components/CampiScadenza";
 import { Avviso, Badge, Card, Titolo, bottone, bottoneSecondario, campo, etichetta, parametro, type SearchParams } from "@/components/ui";
 import { richiediStaff } from "@/lib/sessione";
 import { descriviScadenza, nomeGiorno, ora } from "@/lib/formato";
-import { aggiornaOrario, sospendiOrario } from "../../actions";
+import { aggiornaOrario, eliminaOrario, sospendiOrario } from "../../actions";
 
 type Orario = {
   id: string;
@@ -18,7 +18,15 @@ type Orario = {
   scadenza_modo: string | null;
   scadenza_ora: string | null;
   scadenza_ore_prima: number | null;
-  corsi: { nome: string; capienza: number; scadenza_modo: string; scadenza_ora: string; scadenza_ore_prima: number } | null;
+  scadenza_giorni_prima: number | null;
+  corsi: {
+    nome: string;
+    capienza: number;
+    scadenza_modo: string;
+    scadenza_ora: string;
+    scadenza_ore_prima: number;
+    scadenza_giorni_prima: number;
+  } | null;
 };
 type Abbonato = { abbonamenti: { id: string; tipo: string; data_fine: string; profili: { nome: string; cognome: string } | null } | null };
 
@@ -32,7 +40,7 @@ export default async function OrarioPage({ params, searchParams }: { params: Pro
     supabase
       .from("orari_corso")
       .select(
-        "id, corso_id, giorno_settimana, ora_inizio, durata_minuti, attivo, capienza, scadenza_modo, scadenza_ora, scadenza_ore_prima, corsi(nome, capienza, scadenza_modo, scadenza_ora, scadenza_ore_prima)",
+        "id, corso_id, giorno_settimana, ora_inizio, durata_minuti, attivo, capienza, scadenza_modo, scadenza_ora, scadenza_ore_prima, scadenza_giorni_prima, corsi(nome, capienza, scadenza_modo, scadenza_ora, scadenza_ore_prima, scadenza_giorni_prima)",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -73,9 +81,16 @@ export default async function OrarioPage({ params, searchParams }: { params: Pro
                 <input id="capienza" name="capienza" type="number" min={1} max={500} defaultValue={o.capienza ?? ""} placeholder={`come il corso (${c.capienza})`} className={campo} />
               </div>
             </div>
-            <CampiScadenza id={o.id} conEreditata modo={o.scadenza_modo} oraFissa={o.scadenza_ora ?? c.scadenza_ora} orePrima={o.scadenza_ore_prima ?? c.scadenza_ore_prima} />
+            <CampiScadenza
+              id={o.id}
+              conEreditata
+              modo={o.scadenza_modo}
+              oraFissa={o.scadenza_ora ?? c.scadenza_ora}
+              orePrima={o.scadenza_ore_prima ?? c.scadenza_ore_prima}
+              giorniPrima={o.scadenza_giorni_prima ?? c.scadenza_giorni_prima}
+            />
             <p className="text-xs text-slate-500">
-              Il corso conferma {descriviScadenza(c.scadenza_modo, c.scadenza_ora, c.scadenza_ore_prima)}. Scegli &quot;Come il corso&quot; per
+              Il corso conferma {descriviScadenza(c.scadenza_modo, c.scadenza_ora, c.scadenza_ore_prima, c.scadenza_giorni_prima)}. Scegli &quot;Come il corso&quot; per
               non personalizzare.
             </p>
             <BottoneInvio className={`${bottone} w-full sm:w-auto`}>Salva</BottoneInvio>
@@ -101,6 +116,27 @@ export default async function OrarioPage({ params, searchParams }: { params: Pro
                 {o.attivo ? "Sospendi" : "Riattiva"}
               </BottoneInvio>
             </form>
+          </Card>
+
+          <Card className="border-red-200">
+            <h2 className="mb-1 font-semibold text-red-800">Elimina orario</h2>
+            <p className="mb-3 text-sm text-slate-600">
+              {abbonati.length > 0
+                ? "Prima sposta gli abbonati che hanno questo giorno fisso (qui sotto)."
+                : "Le lezioni future vengono annullate (con avviso ai prenotati) e l'orario sparisce. Le lezioni passate restano nello storico."}
+            </p>
+            {abbonati.length === 0 && (
+              <form action={eliminaOrario} className="space-y-3">
+                <input type="hidden" name="id" value={o.id} />
+                <label className="flex items-start gap-2 text-sm">
+                  <input type="checkbox" name="conferma" value="si" required className="mt-1" />
+                  Sì, voglio eliminare questo orario
+                </label>
+                <BottoneInvio className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-red-700 px-4 text-sm font-semibold text-white hover:bg-red-800">
+                  Elimina orario
+                </BottoneInvio>
+              </form>
+            )}
           </Card>
 
           <Card>

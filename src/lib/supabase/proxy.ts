@@ -32,7 +32,7 @@ export async function aggiornaSessione(request: NextRequest) {
   const user = data?.claims?.sub;
 
   const percorso = request.nextUrl.pathname;
-  const protetta = percorso.startsWith("/admin") || percorso.startsWith("/area");
+  const protetta = percorso.startsWith("/admin") || percorso.startsWith("/area") || percorso.startsWith("/ricevuta");
 
   if (!user && protetta) {
     const url = request.nextUrl.clone();

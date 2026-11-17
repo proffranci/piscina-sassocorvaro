@@ -17,7 +17,7 @@ export function Intestazione({
 }) {
   return (
     <>
-      <header className="righe-corsia spazio-sopra sticky top-0 z-20 bg-abisso text-white md:static">
+      <header className="righe-corsia spazio-sopra sticky top-0 z-20 bg-abisso text-white print:hidden md:static">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 md:py-4">
           <Link href="/" className="min-w-0">
             <Logo chiaro />

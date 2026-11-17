@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BottoneInvio } from "@/components/BottoneInvio";
+import { CampiPagamento } from "@/components/CampiPagamento";
 import { RichiestaCambio, SELECT_RICHIESTE, type RichiestaStaff } from "@/components/RichiestaCambio";
 import { BottoneWhatsApp, testiWhatsApp } from "@/components/WhatsApp";
-import { Avviso, Badge, Card, Titolo, bottoneSecondario, campo, etichetta, parametro, type SearchParams } from "@/components/ui";
+import { Avviso, Badge, Card, Titolo, bottone, bottoneSecondario, campo, etichetta, parametro, type SearchParams } from "@/components/ui";
 import { richiediStaff } from "@/lib/sessione";
-import { data as formattaData, nomeGiorno, ora } from "@/lib/formato";
+import { data as formattaData, euro, nomeGiorno, nomeMetodo, oggiItalia, ora } from "@/lib/formato";
+import { SELECT_PAGAMENTO, numeroRicevuta, type Pagamento } from "@/lib/pagamenti";
 import { cambiaGiorno, cambiaPagato } from "../actions";
+import { annullaPagamento, registraPagamento, salvaPrezzo } from "../../pagamenti/actions";
 
 type Orario = { id: string; corso_id: string; giorno_settimana: number; ora_inizio: string; corsi: { nome: string } | null };
 type Abbonamento = {
@@ -15,6 +18,7 @@ type Abbonamento = {
   data_inizio: string;
   data_fine: string;
   pagato: boolean;
+  prezzo: number | string | null;
   note: string | null;
   utente_id: string;
   profili: { nome: string; cognome: string; telefono: string | null } | null;
@@ -32,17 +36,19 @@ export default async function SchedaAbbonamento({
   const { id } = await params;
   const sp = await searchParams;
 
-  const [abbRes, orariRes, richiesteRes] = await Promise.all([
+  const [abbRes, orariRes, richiesteRes, pagRes] = await Promise.all([
     supabase
       .from("abbonamenti")
       .select(
-        "id, tipo, data_inizio, data_fine, pagato, note, utente_id, profili(nome, cognome, telefono), abbonamenti_orari(orari_corso(id, corso_id, giorno_settimana, ora_inizio, corsi(nome)))",
+        "id, tipo, data_inizio, data_fine, pagato, prezzo, note, utente_id, profili(nome, cognome, telefono), abbonamenti_orari(orari_corso(id, corso_id, giorno_settimana, ora_inizio, corsi(nome)))",
       )
       .eq("id", id)
       .maybeSingle(),
     supabase.from("orari_corso").select("id, corso_id, giorno_settimana, ora_inizio, corsi(nome)").eq("attivo", true).order("giorno_settimana").order("ora_inizio"),
     supabase.from("richieste_cambio").select(SELECT_RICHIESTE).eq("abbonamento_id", id).eq("stato", "in_attesa"),
+    supabase.from("pagamenti").select(SELECT_PAGAMENTO).eq("abbonamento_id", id).order("pagato_il").order("numero"),
   ]);
+  const pagamenti = (pagRes.data ?? []) as unknown as Pagamento[];
   const a = abbRes.data as unknown as Abbonamento | null;
   if (!a) notFound();
   const orari = (orariRes.data ?? []) as unknown as Orario[];
@@ -56,6 +62,9 @@ export default async function SchedaAbbonamento({
   const alternative = orari.filter((o) => o.corso_id === miei[0]?.corso_id && !mieiId.has(o.id));
   const scaduto = a.data_fine < new Date().toISOString().slice(0, 10);
   const pagina = `/admin/abbonamenti/${a.id}`;
+  const prezzo = a.prezzo === null ? null : Number(a.prezzo);
+  const versato = pagamenti.filter((p) => !p.annullato).reduce((t, p) => t + Number(p.importo), 0);
+  const residuo = prezzo === null ? null : Math.max(0, Math.round((prezzo - versato) * 100) / 100);
 
   return (
     <>
@@ -83,7 +92,9 @@ export default async function SchedaAbbonamento({
             <form action={cambiaPagato}>
               <input type="hidden" name="id" value={a.id} />
               <input type="hidden" name="pagato" value={a.pagato ? "no" : "si"} />
-              <BottoneInvio className={bottoneSecondario}>{a.pagato ? "Segna come non pagato" : "Segna come pagato"}</BottoneInvio>
+              <BottoneInvio className={bottoneSecondario} title="Senza registrare un pagamento né fare la ricevuta">
+                {a.pagato ? "Segna come non pagato" : "Segna come pagato (senza ricevuta)"}
+              </BottoneInvio>
             </form>
             {!a.pagato && <BottoneWhatsApp telefono={a.profili?.telefono} testo={testiWhatsApp.pagamento(a.profili?.nome ?? "", a.tipo)} />}
             <Link href={`/admin/utenti/${a.utente_id}`} className={bottoneSecondario}>
@@ -102,6 +113,78 @@ export default async function SchedaAbbonamento({
             </div>
           </Card>
         )}
+
+        {/* ---------- Pagamenti ---------- */}
+        <Card className="lg:col-span-2">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="font-semibold">Pagamenti</h2>
+              <p className="text-sm text-slate-600">
+                Versato <strong>{euro(versato)}</strong>
+                {prezzo !== null && (
+                  <>
+                    {" "}su {euro(prezzo)}
+                    {(residuo ?? 0) > 0 ? (
+                      <> · mancano <strong className="text-amber-800">{euro(residuo)}</strong></>
+                    ) : (
+                      " · saldato ✓"
+                    )}
+                  </>
+                )}
+              </p>
+            </div>
+            <form action={salvaPrezzo} className="flex items-end gap-2">
+              <input type="hidden" name="abbonamento_id" value={a.id} />
+              <div>
+                <label className="mb-1 block text-xs text-slate-600" htmlFor="prezzo">Prezzo concordato (€)</label>
+                <input id="prezzo" name="prezzo" inputMode="decimal" defaultValue={prezzo === null ? "" : String(prezzo).replace(".", ",")} placeholder="—" className={`${campo} w-32`} />
+              </div>
+              <BottoneInvio className={bottoneSecondario}>Salva</BottoneInvio>
+            </form>
+          </div>
+
+          {pagamenti.length > 0 && (
+            <ul className="mb-5 divide-y divide-slate-100 rounded-xl border border-slate-200 text-sm">
+              {pagamenti.map((p) => (
+                <li key={p.id} className={`flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 ${p.annullato ? "opacity-60" : ""}`}>
+                  <span>
+                    <strong className={`tabular-nums ${p.annullato ? "line-through" : ""}`}>{euro(p.importo)}</strong> · {nomeMetodo(p.metodo)} ·{" "}
+                    {formattaData(p.pagato_il)}
+                    <span className="block text-xs text-slate-500">
+                      Ricevuta n. {numeroRicevuta(p)}
+                      {p.note ? ` · ${p.note}` : ""}
+                      {p.annullato ? ` · annullata: ${p.motivo_annullamento ?? ""}` : ""}
+                    </span>
+                  </span>
+                  <span className="flex flex-wrap items-center gap-2">
+                    <Link href={`/ricevuta/${p.id}?torna=${encodeURIComponent(pagina)}`} className={bottoneSecondario}>🧾 Ricevuta</Link>
+                    {!p.annullato && (
+                      <details>
+                        <summary className="cursor-pointer text-xs text-slate-500 underline">Annulla</summary>
+                        <form action={annullaPagamento} className="mt-2 flex gap-2">
+                          <input type="hidden" name="id" value={p.id} />
+                          <input type="hidden" name="torna" value={pagina} />
+                          <input name="motivo" required placeholder="Motivo" className={campo} />
+                          <BottoneInvio className={bottoneSecondario}>OK</BottoneInvio>
+                        </form>
+                      </details>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <details open={!a.pagato} className="rounded-xl bg-schiuma p-4">
+            <summary className="cursor-pointer font-medium">💶 Registra un pagamento</summary>
+            <form action={registraPagamento} className="mt-4 space-y-3">
+              <input type="hidden" name="abbonamento_id" value={a.id} />
+              <input type="hidden" name="torna" value={pagina} />
+              <CampiPagamento id={a.id} oggi={oggiItalia()} importo={residuo && residuo > 0 ? residuo : null} />
+              <BottoneInvio className={`${bottone} w-full sm:w-auto`}>Registra e apri la ricevuta</BottoneInvio>
+            </form>
+          </details>
+        </Card>
 
         <Card className="lg:col-span-2">
           <h2 className="mb-1 font-semibold">Giorni fissi</h2>

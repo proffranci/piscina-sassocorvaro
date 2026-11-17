@@ -175,3 +175,31 @@ export async function reimpostaPassword(id: string, scelta?: string) {
   await admin.from("profili").update({ deve_cambiare_password: true }).eq("id", id);
   return { ok: true as const, password };
 }
+
+// Elimina per sempre un account: abbonamenti, prenotazioni e avvisi se ne vanno con lui.
+// Le ricevute dei pagamenti restano (con il nome scritto sopra), per la contabilità.
+// Per conferma bisogna riscrivere il nome utente.
+export async function eliminaUtente(formData: FormData) {
+  const id = testo(formData, "id");
+  const pagina = `/admin/utenti/${id}`;
+  const { sessione, admin, utente } = await bersaglioGestibile(id, pagina);
+  const nome = `${utente.nome} ${utente.cognome}`.trim() || utente.nome_utente || "utente";
+  const atteso = utente.nome_utente ?? nome;
+
+  if (testo(formData, "conferma").toLowerCase() !== atteso.toLowerCase()) {
+    errore(pagina, `Per eliminare scrivi esattamente "${atteso}".`);
+  }
+  if (utente.ruolo === "admin") {
+    const { count } = await admin.from("profili").select("id", { count: "exact", head: true }).eq("ruolo", "admin").eq("attivo", true);
+    if ((count ?? 0) <= 1) errore(pagina, "È l'unico amministratore: non si può eliminare.");
+  }
+
+  // Eliminando l'accesso, il database cancella a cascata il profilo e i suoi dati
+  const { error } = await admin.auth.admin.deleteUser(id);
+  if (error) {
+    console.error("[utenti] eliminazione fallita:", error);
+    errore(pagina, "Eliminazione non riuscita.");
+  }
+  await admin.from("attivita").insert({ tipo: "eliminazione", descrizione: `Account eliminato: ${nome}`, autore_id: sessione.profilo.id });
+  ok("/admin/utenti", `Account di ${nome} eliminato.`);
+}

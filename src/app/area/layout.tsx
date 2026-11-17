@@ -15,6 +15,7 @@ export default async function AreaLayout({ children }: { children: React.ReactNo
   const voci: Voce[] = [
     { href: "/area", testo: "Lezioni", icona: "calendario" },
     { href: "/area/prenota", testo: "Prenota", icona: "piu" },
+    { href: "/area/tessera", testo: "Tessera", icona: "qr" },
     { href: "/area/avvisi", testo: "Avvisi", icona: "campana", numero: count ?? 0 },
     { href: "/area/profilo", testo: "Profilo", icona: "utente" },
   ];

@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { BottoneInvio } from "@/components/BottoneInvio";
+import { CampiPagamento } from "@/components/CampiPagamento";
 import { Avviso, Card, Titolo, bottone, bottoneSecondario, campo, etichetta, parametro, type SearchParams } from "@/components/ui";
 import { richiediStaff } from "@/lib/sessione";
-import { ora } from "@/lib/formato";
+import { oggiItalia, ora } from "@/lib/formato";
 import { creaAbbonamento } from "../actions";
 
 type Utente = { id: string; nome: string; cognome: string; nome_utente: string | null };
-type Corso = { id: string; nome: string; giorni_abbonamento: number };
+type Corso = { id: string; nome: string; giorni_abbonamento: number; prezzo_abbonamento: number | null };
 type Orario = { id: string; giorno_settimana: number; ora_inizio: string };
 
 const GIORNI_BREVI = ["", "Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"];
@@ -17,7 +18,7 @@ export default async function NuovoAbbonamentoPage({ searchParams }: { searchPar
 
   const [utentiRes, corsiRes] = await Promise.all([
     supabase.from("profili").select("id, nome, cognome, nome_utente").eq("ruolo", "utente").eq("attivo", true).order("cognome"),
-    supabase.from("corsi").select("id, nome, giorni_abbonamento").eq("attivo", true).order("nome"),
+    supabase.from("corsi").select("id, nome, giorni_abbonamento, prezzo_abbonamento").eq("attivo", true).order("nome"),
   ]);
   const utenti = (utentiRes.data ?? []) as unknown as Utente[];
   const corsi = (corsiRes.data ?? []) as unknown as Corso[];
@@ -127,10 +128,24 @@ export default async function NuovoAbbonamentoPage({ searchParams }: { searchPar
                 <label className={etichetta} htmlFor="note">Note (facoltative)</label>
                 <textarea id="note" name="note" rows={2} className={campo} />
               </div>
-              <label className="flex items-center gap-2 text-sm sm:col-span-2">
-                <input type="checkbox" name="pagato" />
-                Già pagato
-              </label>
+              <div>
+                <label className={etichetta} htmlFor="prezzo">Prezzo concordato (€, facoltativo)</label>
+                <input
+                  id="prezzo"
+                  name="prezzo"
+                  inputMode="decimal"
+                  defaultValue={corso.prezzo_abbonamento !== null ? String(corso.prezzo_abbonamento).replace(".", ",") : ""}
+                  placeholder="Es. 120,00"
+                  className={campo}
+                />
+              </div>
+              <div className="rounded-xl bg-schiuma p-4 sm:col-span-2">
+                <p className="mb-1 text-sm font-semibold">4. Pagamento</p>
+                <p className="mb-3 text-xs text-slate-500">
+                  Se paga adesso compila l&apos;importo: si apre subito la ricevuta da stampare. Lascia vuoto se pagherà dopo.
+                </p>
+                <CampiPagamento id="nuovo" oggi={oggiItalia()} obbligatorio={false} />
+              </div>
               <div className="sm:col-span-2">
                 <BottoneInvio className={`${bottone} w-full sm:w-auto`}>Crea abbonamento</BottoneInvio>
               </div>

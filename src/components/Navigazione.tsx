@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 export type Voce = {
   href: string;
   testo: string;
-  icona: "casa" | "persone" | "tessera" | "calendario" | "campana" | "utente" | "piu";
+  icona: "casa" | "persone" | "tessera" | "calendario" | "campana" | "utente" | "piu" | "qr" | "euro";
   numero?: number; // pallino rosso (es. avvisi non letti)
   soloComputer?: boolean; // sul telefono non sta nella barra in basso
 };
@@ -68,6 +68,22 @@ function Icona({ nome }: { nome: Voce["icona"] }) {
           <path d="M4.5 20.5c0-4 3.4-7 7.5-7s7.5 3 7.5 7" />
         </svg>
       );
+    case "qr":
+      return (
+        <svg {...comune}>
+          <rect x="3.5" y="3.5" width="6" height="6" rx="1" />
+          <rect x="14.5" y="3.5" width="6" height="6" rx="1" />
+          <rect x="3.5" y="14.5" width="6" height="6" rx="1" />
+          <path d="M14.5 14.5h2.5v2.5M20.5 14.5v6h-6M17 20.5v-1" />
+        </svg>
+      );
+    case "euro":
+      return (
+        <svg {...comune}>
+          <path d="M17.5 6.5A7 7 0 1 0 17.5 17.5" />
+          <path d="M4 10h9M4 14h9" />
+        </svg>
+      );
     case "piu":
       return (
         <svg {...comune}>
@@ -121,7 +137,7 @@ export function NavBassa({ voci: tutte }: { voci: Voce[] }) {
   const percorso = usePathname() ?? "";
   const voci = tutte.filter((v) => !v.soloComputer);
   return (
-    <nav className="spazio-sotto fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 shadow-[0_-4px_16px_rgba(11,46,69,0.08)] backdrop-blur md:hidden">
+    <nav className="spazio-sotto fixed inset-x-0 bottom-0 z-30 print:hidden border-t border-slate-200 bg-white/95 shadow-[0_-4px_16px_rgba(11,46,69,0.08)] backdrop-blur md:hidden">
       <ul className="mx-auto grid max-w-md" style={{ gridTemplateColumns: `repeat(${voci.length}, minmax(0, 1fr))` }}>
         {voci.map((v) => {
           const on = attiva(percorso, v.href);

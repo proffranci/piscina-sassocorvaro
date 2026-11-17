@@ -49,6 +49,8 @@ const ICONE: Record<string, string> = {
   richiesta: "📝",
   cambio_giorno: "🔄",
   preferenza: "👤",
+  ingresso: "🚪",
+  eliminazione: "🗑️",
 };
 
 function nome(a: Abb) {
