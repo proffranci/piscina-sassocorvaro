@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { bottone, bottoneSecondario, campo } from "@/components/ui";
-import { ESITI, type EsitoIngresso } from "@/lib/ingresso";
-import { registraIngresso } from "./actions";
+import { ESITI, type Controllo, type Registrato } from "@/lib/ingresso";
+import { controllaCodice } from "./actions";
+import { FinestraIngresso } from "./FinestraIngresso";
 
 type Modo = "fotocamera" | "lettore" | "nfc";
 
@@ -48,10 +49,13 @@ function bip(buono: boolean) {
   navigator.vibrate?.(buono ? 80 : [120, 80, 120]);
 }
 
-export function LettoreIngresso() {
+export function LettoreIngresso({ codiceIniziale }: { codiceIniziale?: string | null }) {
   const router = useRouter();
   const [modo, setModo] = useState<Modo>("fotocamera");
-  const [risultato, setRisultato] = useState<(EsitoIngresso & { codice: string }) | null>(null);
+  // Il controllo appena letto (si apre la finestra "cosa entra a fare?")
+  const [controllo, setControllo] = useState<(Controllo & { codice: string }) | null>(null);
+  // L'ultimo ingresso registrato (banner colorato)
+  const [risultato, setRisultato] = useState<Registrato | null>(null);
   const [errore, setErrore] = useState<string | null>(null);
   const [inCorso, setInCorso] = useState(false);
   const [statoCamera, setStatoCamera] = useState<"spenta" | "accesa" | "negata" | "assente">("spenta");
@@ -70,42 +74,60 @@ export function LettoreIngresso() {
     setNfcPossibile(typeof window !== "undefined" && "NDEFReader" in window);
   }, []);
 
-  // ---------- Invio del codice al database ----------
-  const invia = useCallback(
-    async (codice: string, forza = false) => {
-      const pulito = codice.trim();
-      if (!pulito || occupato.current) return;
-      // Lo stesso QR davanti alla fotocamera per qualche secondo: una lettura sola
-      if (!forza && pulito === ultimo.current.codice && Date.now() - ultimo.current.quando < 6000) return;
-      ultimo.current = { codice: pulito, quando: Date.now() };
-      occupato.current = true;
-      setInCorso(true);
-      setErrore(null);
-      try {
-        const r = await registraIngresso(pulito, forza);
-        if ("errore" in r) {
-          setErrore(r.errore);
-          setRisultato(null);
-          bip(false);
-        } else {
-          setRisultato({ ...r, codice: pulito });
-          bip(r.esito === "ok" || r.esito === "forzato");
-          router.refresh(); // aggiorna l'elenco "Entrati oggi"
-        }
-      } catch {
-        setErrore("Connessione assente: riprova.");
-        bip(false);
-      } finally {
+  // ---------- Lettura: il database controlla, non registra ancora niente ----------
+  const invia = useCallback(async (codice: string) => {
+    const pulito = codice.trim();
+    if (!pulito || occupato.current) return;
+    // Lo stesso QR davanti alla fotocamera per qualche secondo: una lettura sola
+    if (pulito === ultimo.current.codice && Date.now() - ultimo.current.quando < 6000) return;
+    ultimo.current = { codice: pulito, quando: Date.now() };
+    occupato.current = true; // resta occupato finché la finestra è aperta
+    setInCorso(true);
+    setErrore(null);
+    try {
+      const r = await controllaCodice(pulito);
+      if ("errore" in r) {
+        setErrore(r.errore);
         occupato.current = false;
-        setInCorso(false);
-        if (campoLettore.current) {
-          campoLettore.current.value = "";
-          campoLettore.current.focus();
-        }
+        bip(false);
+      } else if (!r.trovato) {
+        setErrore(r.avvisi[0] ?? "Codice non riconosciuto.");
+        occupato.current = false;
+        bip(false);
+      } else {
+        setRisultato(null);
+        setControllo({ ...r, codice: pulito });
+        bip(r.esito === "ok" || r.esito === "scegli");
       }
+    } catch {
+      setErrore("Connessione assente: riprova.");
+      occupato.current = false;
+      bip(false);
+    } finally {
+      setInCorso(false);
+      if (campoLettore.current) campoLettore.current.value = "";
+    }
+  }, []);
+
+  const chiudiFinestra = useCallback(
+    (fatto: Registrato | null) => {
+      setControllo(null);
+      occupato.current = false;
+      ultimo.current = { codice: ultimo.current.codice, quando: Date.now() };
+      if (fatto) {
+        setRisultato(fatto);
+        bip(fatto.esito !== "negato");
+        router.refresh(); // aggiorna l'elenco degli ingressi
+      }
+      setTimeout(() => campoLettore.current?.focus(), 50);
     },
     [router],
   );
+
+  // Arrivato dalla scheda utente ("Registra ingresso"): apriamo subito la finestra
+  useEffect(() => {
+    if (codiceIniziale) invia(codiceIniziale);
+  }, [codiceIniziale, invia]);
 
   // ---------- Fotocamera ----------
   const spegniCamera = useCallback(() => {
@@ -339,9 +361,9 @@ export function LettoreIngresso() {
       {risultato && stile && (
         <div className={`rounded-2xl p-5 text-white shadow-lg ${stile.colore}`} role="status" aria-live="assertive">
           <p className="text-sm font-semibold uppercase tracking-wide opacity-90">
-            {stile.icona} {stile.titolo}
+            {stile.icona} Entrato · {stile.titolo}
           </p>
-          <p className="mt-1 text-3xl font-bold">{risultato.nome ?? "Sconosciuto"}</p>
+          <p className="mt-1 text-3xl font-bold">{risultato.nome}</p>
           {risultato.lezione && <p className="mt-1 text-lg">{risultato.lezione}</p>}
           {risultato.messaggi.length > 0 && (
             <ul className="mt-3 space-y-1 text-base">
@@ -350,32 +372,26 @@ export function LettoreIngresso() {
               ))}
             </ul>
           )}
-          {risultato.abbonamenti.length > 0 && (
-            <p className="mt-3 text-sm opacity-90">
-              {risultato.abbonamenti.map((a) => `${a.tipo} ${a.pagato ? "✓ pagato" : "✗ da pagare"}`).join(" · ")}
-            </p>
-          )}
           <div className="mt-4 flex flex-wrap gap-2">
-            {risultato.esito === "negato" && risultato.utente_id && (
-              <button
-                type="button"
-                onClick={() => invia(risultato.codice, true)}
-                className="min-h-[44px] rounded-lg bg-white px-4 text-sm font-semibold text-red-700"
+            {risultato.pagamento_id && (
+              <Link
+                href={`/ricevuta/${risultato.pagamento_id}?torna=${encodeURIComponent("/admin/ingresso")}`}
+                className="inline-flex min-h-[44px] items-center rounded-lg bg-white px-4 text-sm font-semibold text-abisso"
               >
-                Fallo entrare comunque
-              </button>
-            )}
-            {risultato.utente_id && (
-              <Link href={`/admin/utenti/${risultato.utente_id}`} className="inline-flex min-h-[44px] items-center rounded-lg border border-white/50 px-4 text-sm">
-                Scheda cliente
+                🧾 Ricevuta
               </Link>
             )}
+            <Link href={`/admin/utenti/${risultato.utente_id}`} className="inline-flex min-h-[44px] items-center rounded-lg border border-white/50 px-4 text-sm">
+              Scheda cliente
+            </Link>
             <button type="button" onClick={() => setRisultato(null)} className="min-h-[44px] rounded-lg border border-white/50 px-4 text-sm">
               Prossimo
             </button>
           </div>
         </div>
       )}
+
+      {controllo && <FinestraIngresso controllo={controllo} codice={controllo.codice} onChiudi={chiudiFinestra} />}
     </div>
   );
 }

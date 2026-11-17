@@ -23,6 +23,7 @@ export async function creaAbbonamento(formData: FormData) {
   const dataInizio = testo(formData, "data_inizio");
   const dataFine = testo(formData, "data_fine");
   const note = testo(formData, "note") || null;
+  const pagareEntro = DATA.test(testo(formData, "pagare_entro")) ? testo(formData, "pagare_entro") : null; // vuoto = il primo giorno
   const prezzoScritto = testo(formData, "prezzo");
   const prezzo = prezzoScritto ? leggiImporto(prezzoScritto) : null;
   // Paga subito? Solo se ha scritto un importo
@@ -56,7 +57,7 @@ export async function creaAbbonamento(formData: FormData) {
 
   const { data: nuovo, error } = await supabase
     .from("abbonamenti")
-    .insert({ utente_id: utenteId, tipo, data_inizio: dataInizio, data_fine: dataFine, note, prezzo })
+    .insert({ utente_id: utenteId, tipo, data_inizio: dataInizio, data_fine: dataFine, note, prezzo, pagare_entro: pagareEntro })
     .select("id")
     .single();
   if (error || !nuovo) errore(pagina, "Non sono riuscito a salvare l'abbonamento.");

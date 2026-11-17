@@ -9,10 +9,11 @@ import { SELECT_PAGAMENTO, SELECT_PAGAMENTI_ABB, numeroRicevuta, statoPagamento,
 import { BadgePagamento } from "@/components/BadgePagamento";
 import { registraPagamento, verificaPagamento } from "../../pagamenti/actions";
 import { aggiornaUtente, cambiaAttivo, cambiaNomeUtente, eliminaUtente } from "../actions";
-import { assegnaTessera, ingressoManuale, rigeneraQrUtente } from "../../ingresso/actions";
+import { assegnaTessera, rigeneraQrUtente } from "../../ingresso/actions";
+import { ESITI, MOTIVI, type RigaIngresso } from "@/lib/ingresso";
 import { ReimpostaPassword } from "./ReimpostaPassword";
 
-type Abb = { id: string; tipo: string; data_inizio: string; data_fine: string; pagato: boolean; prezzo: number | string | null; pagamenti: PagamentoBreve[] };
+type Abb = { id: string; tipo: string; data_inizio: string; data_fine: string; pagato: boolean; prezzo: number | string | null; pagare_entro: string | null; pagamenti: PagamentoBreve[] };
 type Attivita = { id: number; creata_il: string; descrizione: string };
 
 export default async function SchedaUtente({
@@ -26,12 +27,14 @@ export default async function SchedaUtente({
   const { id } = await params;
   const sp = await searchParams;
 
-  const [utenteRes, abbRes, attRes, pagRes] = await Promise.all([
+  const [utenteRes, abbRes, attRes, pagRes, ingRes] = await Promise.all([
     supabase.from("profili").select("*").eq("id", id).maybeSingle(),
-    supabase.from("abbonamenti").select(`id, tipo, data_inizio, data_fine, pagato, prezzo, ${SELECT_PAGAMENTI_ABB}`).eq("utente_id", id).order("data_fine", { ascending: false }),
+    supabase.from("abbonamenti").select(`id, tipo, data_inizio, data_fine, pagato, prezzo, pagare_entro, ${SELECT_PAGAMENTI_ABB}`).eq("utente_id", id).order("data_fine", { ascending: false }),
     supabase.from("attivita").select("id, creata_il, descrizione").eq("utente_id", id).order("creata_il", { ascending: false }).limit(15),
     supabase.from("pagamenti").select(SELECT_PAGAMENTO).eq("utente_id", id).order("pagato_il", { ascending: false }).limit(20),
+    supabase.from("ingressi").select("id, creato_il, utente_id, nome, esito, messaggi, motivo, pagamento_id").eq("utente_id", id).order("creato_il", { ascending: false }).limit(8),
   ]);
+  const ingressi = (ingRes.data ?? []) as unknown as RigaIngresso[];
   const pagamenti = (pagRes.data ?? []) as unknown as Pagamento[];
   const u = utenteRes.data as unknown as Profilo | null;
   if (!u) notFound();
@@ -139,14 +142,23 @@ export default async function SchedaUtente({
                 </Link>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
-                <form action={ingressoManuale} className="rounded-xl bg-schiuma p-3">
-                  <input type="hidden" name="utente_id" value={u.id} />
+                <div className="rounded-xl bg-schiuma p-3">
                   <p className="mb-2 text-sm">Ha dimenticato QR e tessera?</p>
-                  <label className="mb-2 flex items-center gap-2 text-xs text-slate-600">
-                    <input type="checkbox" name="forza" /> Fallo entrare anche se non risulta valido
-                  </label>
-                  <BottoneInvio className={`${bottoneSecondario} w-full`}>🚪 Registra ingresso ora</BottoneInvio>
-                </form>
+                  <Link href={`/admin/ingresso?utente=${u.id}`} className={`${bottoneSecondario} w-full`}>
+                    🚪 Registra ingresso
+                  </Link>
+                  {ingressi.length > 0 && (
+                    <ul className="mt-3 space-y-0.5 text-xs text-slate-600">
+                      <li className="font-semibold uppercase tracking-wide text-slate-500">Ultimi ingressi</li>
+                      {ingressi.map((i) => (
+                        <li key={i.id}>
+                          {ESITI[i.esito]?.icona} {etichettaGiorno(i.creato_il)} {oraDi(i.creato_il)}
+                          {i.motivo ? ` · ${MOTIVI[i.motivo] ?? i.motivo}` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
                 <form action={assegnaTessera} className="rounded-xl border border-slate-200 p-3">
                   <input type="hidden" name="utente_id" value={u.id} />
                   <label className="mb-1 block text-sm" htmlFor="tessera">
@@ -199,7 +211,7 @@ export default async function SchedaUtente({
                         </span>
                         <span className="flex gap-1">
                           {a.data_fine < oggi && <Badge>scaduto</Badge>}
-                          <BadgePagamento stato={sp.stato} />
+                          <BadgePagamento stato={sp.stato} urgente={sp.urgente} pagareEntro={a.pagare_entro} />
                         </span>
                       </Link>
                       {/* "Ha saldato": un clic, poi l'admin verifica */}

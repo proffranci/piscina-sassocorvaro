@@ -15,6 +15,7 @@ type Riga = {
   data_fine: string;
   pagato: boolean;
   prezzo: number | string | null;
+  pagare_entro: string | null;
   pagamenti: PagamentoBreve[];
   note: string | null;
   profili: { nome: string; cognome: string; email: string | null; telefono: string | null } | null;
@@ -32,7 +33,7 @@ export default async function AbbonamentiPage({ searchParams }: { searchParams: 
   let query = supabase
     .from("abbonamenti")
     .select(
-      `id, tipo, data_inizio, data_fine, pagato, prezzo, note, ${SELECT_PAGAMENTI_ABB}, profili(nome, cognome, email, telefono), abbonamenti_orari(orari_corso(giorno_settimana, ora_inizio, corsi(nome)))`,
+      `id, tipo, data_inizio, data_fine, pagato, prezzo, pagare_entro, note, ${SELECT_PAGAMENTI_ABB}, profili(nome, cognome, email, telefono), abbonamenti_orari(orari_corso(giorno_settimana, ora_inizio, corsi(nome)))`,
     )
     .order("data_fine", { ascending: true });
   if (!mostraScaduti) query = query.gte("data_fine", oggi);
@@ -71,7 +72,7 @@ export default async function AbbonamentiPage({ searchParams }: { searchParams: 
       <div className="grid gap-4 md:grid-cols-2">
         {abbonamenti.map((a) => {
           const scaduto = a.data_fine < oggi;
-          const { stato, residuo } = statoPagamento(a);
+          const { stato, residuo, urgente } = statoPagamento(a);
           const daIncassare = !scaduto && (stato === "da_pagare" || stato === "acconto");
           const orari = a.abbonamenti_orari
             .map((x) => x.orari_corso)
@@ -88,7 +89,7 @@ export default async function AbbonamentiPage({ searchParams }: { searchParams: 
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   {scaduto && <Badge>scaduto</Badge>}
-                  <BadgePagamento stato={stato} />
+                  <BadgePagamento stato={stato} urgente={urgente} pagareEntro={a.pagare_entro} />
                 </div>
               </div>
 
