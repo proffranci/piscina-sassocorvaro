@@ -27,6 +27,7 @@ type Abb = {
   data_fine: string;
   pagato: boolean;
   prezzo?: number | string | null;
+  pagare_entro?: string | null;
   pagamenti?: PagamentoBreve[];
   profili: { nome: string; cognome: string; telefono: string | null } | null;
 };
@@ -104,7 +105,7 @@ export default async function OggiPage({ searchParams }: { searchParams: SearchP
       .order("inizio"),
     supabase
       .from("abbonamenti")
-      .select(`id, tipo, data_fine, pagato, prezzo, ${SELECT_PAGAMENTI_ABB}, profili(nome, cognome, telefono)`)
+      .select(`id, tipo, data_fine, pagato, prezzo, pagare_entro, ${SELECT_PAGAMENTI_ABB}, profili(nome, cognome, telefono)`)
       .eq("pagato", false)
       .gte("data_fine", oggiData)
       .order("data_fine"),
@@ -139,8 +140,9 @@ export default async function OggiPage({ searchParams }: { searchParams: SearchP
   const lezioni = ((lezRes.data ?? []) as unknown as LezioneOggi[]).filter(
     (l) => giornoChiave(l.inizio) === oggi && !l.annullata,
   );
-  // Chi ha già pagato in reception (in attesa di verifica) non va sollecitato
-  const daPagare = ((daPagareRes.data ?? []) as unknown as Abb[]).filter((a) => statoPagamento(a).stato !== "in_verifica");
+  // Solo chi deve pagare entro una settimana (o è in ritardo); chi ha già pagato
+  // in reception ed è in attesa di verifica non va sollecitato
+  const daPagare = ((daPagareRes.data ?? []) as unknown as Abb[]).filter((a) => statoPagamento(a).urgente);
   const inScadenza = (inScadRes.data ?? []) as unknown as Abb[];
   const scaduti = (scadutiRes.data ?? []) as unknown as Abb[];
   const cronologia = (cronoRes.data ?? []) as unknown as Attivita[];
@@ -244,13 +246,16 @@ export default async function OggiPage({ searchParams }: { searchParams: SearchP
         </Controllo>
 
         {/* 2. Pagamenti */}
-        <Controllo titolo="Abbonamenti da incassare" numero={daPagare.length} vuoto="Tutti gli abbonamenti attivi sono pagati.">
+        <Controllo titolo="Pagamenti entro 7 giorni" numero={daPagare.length} vuoto="Nessun pagamento in scadenza questa settimana.">
           <ul className="divide-y divide-slate-100 text-sm">
             {daPagare.map((a) => (
               <li key={a.id} className="flex items-center justify-between gap-2 py-2">
                 <span>
                   <strong>{nome(a)}</strong>
-                  <span className="block text-xs text-slate-500">{a.tipo}</span>
+                  <span className="block text-xs text-slate-500">
+                    {a.tipo}
+                    {a.pagare_entro ? ` · entro il ${formattaData(a.pagare_entro)}` : ""}
+                  </span>
                 </span>
                 <span className="flex shrink-0 gap-2">
                   <BottoneWhatsApp telefono={a.profili?.telefono} testo={testiWhatsApp.pagamento(a.profili?.nome ?? "", a.tipo)} etichetta="" />

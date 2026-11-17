@@ -46,7 +46,12 @@ export const SELECT_PAGAMENTI_ABB = "pagamenti(importo, verificato, annullato)";
 
 export type PagamentoBreve = { importo: number | string; verificato: boolean; annullato: boolean };
 
-export function statoPagamento(a: { pagato: boolean; prezzo?: number | string | null; pagamenti?: PagamentoBreve[] | null }) {
+export function statoPagamento(a: {
+  pagato: boolean;
+  prezzo?: number | string | null;
+  pagamenti?: PagamentoBreve[] | null;
+  pagare_entro?: string | null;
+}) {
   const validi = (a.pagamenti ?? []).filter((p) => !p.annullato);
   const verificato = validi.filter((p) => p.verificato).reduce((t, p) => t + Number(p.importo), 0);
   const inAttesa = validi.filter((p) => !p.verificato).reduce((t, p) => t + Number(p.importo), 0);
@@ -58,7 +63,12 @@ export function statoPagamento(a: { pagato: boolean; prezzo?: number | string | 
   else if (inAttesa > 0 && (residuo === null || residuo === 0)) stato = "in_verifica";
   else if (verificato + inAttesa > 0) stato = "acconto";
   else stato = "da_pagare";
-  return { stato, verificato, inAttesa, prezzo, residuo };
+  // ⚠️ solo se manca una settimana (o meno) alla data "da pagare entro", o è già passata
+  const limite = new Date(Date.now() + 7 * 86_400_000).toLocaleDateString("sv-SE", { timeZone: "Europe/Rome" });
+  const daIncassare = stato === "da_pagare" || stato === "acconto";
+  const urgente = daIncassare && (!a.pagare_entro || a.pagare_entro <= limite);
+  const scaduto = daIncassare && !!a.pagare_entro && a.pagare_entro < new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Rome" });
+  return { stato, verificato, inAttesa, prezzo, residuo, urgente, scaduto, pagareEntro: a.pagare_entro ?? null };
 }
 
 export const ETICHETTE_STATO: Record<StatoPagamento, { testo: string; tono: "ok" | "attenzione" | "neutro" }> = {

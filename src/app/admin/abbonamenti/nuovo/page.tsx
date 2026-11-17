@@ -140,6 +140,11 @@ export default async function NuovoAbbonamentoPage({ searchParams }: { searchPar
                   className={campo}
                 />
               </div>
+              <div>
+                <label className={etichetta} htmlFor="pagare_entro">Da pagare entro</label>
+                <input id="pagare_entro" name="pagare_entro" type="date" defaultValue={oggi} className={campo} />
+                <p className="mt-1 text-xs text-slate-500">L&apos;avviso ⚠️ compare da una settimana prima.</p>
+              </div>
               <div className="rounded-xl bg-schiuma p-4 sm:col-span-2">
                 <p className="mb-1 text-sm font-semibold">4. Pagamento</p>
                 <p className="mb-3 text-xs text-slate-500">

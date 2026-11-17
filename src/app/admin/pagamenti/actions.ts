@@ -71,7 +71,9 @@ export async function salvaPrezzo(formData: FormData) {
   // Il database salva il prezzo e ricalcola se l'abbonamento è saldato
   const { error } = await supabase.rpc("imposta_prezzo", { p_abbonamento: id, p_prezzo: prezzo });
   if (error) vai(torna, "errore", messaggioDb(error, "Salvataggio non riuscito."));
-  vai(torna, "ok", prezzo === null ? "Prezzo tolto." : "Prezzo salvato.");
+  const entro = testo(formData, "pagare_entro");
+  if (/^\d{4}-\d{2}-\d{2}$/.test(entro)) await supabase.from("abbonamenti").update({ pagare_entro: entro }).eq("id", id);
+  vai(torna, "ok", "Prezzo e scadenza del pagamento salvati.");
 }
 
 // L'admin conferma un pagamento registrato dallo staff (o lo rifiuta con il motivo)

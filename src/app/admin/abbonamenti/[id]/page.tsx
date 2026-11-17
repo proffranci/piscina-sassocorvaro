@@ -20,6 +20,7 @@ type Abbonamento = {
   data_fine: string;
   pagato: boolean;
   prezzo: number | string | null;
+  pagare_entro: string | null;
   note: string | null;
   utente_id: string;
   profili: { nome: string; cognome: string; telefono: string | null } | null;
@@ -42,7 +43,7 @@ export default async function SchedaAbbonamento({
     supabase
       .from("abbonamenti")
       .select(
-        "id, tipo, data_inizio, data_fine, pagato, prezzo, note, utente_id, profili(nome, cognome, telefono), abbonamenti_orari(orari_corso(id, corso_id, giorno_settimana, ora_inizio, corsi(nome)))",
+        "id, tipo, data_inizio, data_fine, pagato, prezzo, pagare_entro, note, utente_id, profili(nome, cognome, telefono), abbonamenti_orari(orari_corso(id, corso_id, giorno_settimana, ora_inizio, corsi(nome)))",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -64,7 +65,7 @@ export default async function SchedaAbbonamento({
   const alternative = orari.filter((o) => o.corso_id === miei[0]?.corso_id && !mieiId.has(o.id));
   const scaduto = a.data_fine < new Date().toISOString().slice(0, 10);
   const pagina = `/admin/abbonamenti/${a.id}`;
-  const { stato, verificato, inAttesa, prezzo, residuo } = statoPagamento({ ...a, pagamenti });
+  const { stato, verificato, inAttesa, prezzo, residuo, urgente } = statoPagamento({ ...a, pagamenti });
 
   return (
     <>
@@ -84,7 +85,7 @@ export default async function SchedaAbbonamento({
             </div>
             <div className="flex flex-col items-end gap-1">
               {scaduto && <Badge>scaduto</Badge>}
-              <BadgePagamento stato={stato} />
+              <BadgePagamento stato={stato} urgente={urgente} pagareEntro={a.pagare_entro} />
             </div>
           </div>
           {a.note && <p className="mt-3 text-sm italic text-slate-600">{a.note}</p>}
@@ -139,8 +140,12 @@ export default async function SchedaAbbonamento({
             <form action={salvaPrezzo} className="flex items-end gap-2">
               <input type="hidden" name="abbonamento_id" value={a.id} />
               <div>
-                <label className="mb-1 block text-xs text-slate-600" htmlFor="prezzo">Prezzo concordato (€)</label>
-                <input id="prezzo" name="prezzo" inputMode="decimal" defaultValue={prezzo === null ? "" : String(prezzo).replace(".", ",")} placeholder="—" className={`${campo} w-32`} />
+                <label className="mb-1 block text-xs text-slate-600" htmlFor="prezzo">Prezzo (€)</label>
+                <input id="prezzo" name="prezzo" inputMode="decimal" defaultValue={prezzo === null ? "" : String(prezzo).replace(".", ",")} placeholder="—" className={`${campo} w-28`} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-slate-600" htmlFor="pagare_entro">Da pagare entro</label>
+                <input id="pagare_entro" name="pagare_entro" type="date" defaultValue={a.pagare_entro ?? a.data_inizio} className={`${campo} w-40`} />
               </div>
               <BottoneInvio className={bottoneSecondario}>Salva</BottoneInvio>
             </form>
