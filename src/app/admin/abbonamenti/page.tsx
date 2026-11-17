@@ -39,7 +39,14 @@ export default async function AbbonamentiPage({ searchParams }: { searchParams: 
 
   return (
     <>
-      <Titolo azione={<Link href="/admin/abbonamenti/nuovo" className={bottone}>+ Nuovo abbonamento</Link>}>
+      <Titolo
+        azione={
+          <div className="flex gap-2">
+            <Link href="/admin/pagamenti" className={bottoneSecondario}>💶 Pagamenti e ricevute</Link>
+            <Link href="/admin/abbonamenti/nuovo" className={bottone}>+ Nuovo abbonamento</Link>
+          </div>
+        }
+      >
         Abbonamenti
       </Titolo>
       <Avviso errore={parametro(params.errore)} ok={parametro(params.ok)} />

@@ -2,11 +2,12 @@ import Link from "next/link";
 import { BottoneInvio } from "@/components/BottoneInvio";
 import { Avviso, Card, parametro, type SearchParams } from "@/components/ui";
 import { richiediUtente } from "@/lib/sessione";
-import { etichettaGiorno, giornoChiave, oraDi } from "@/lib/formato";
+import { etichettaGiorno, giornoChiave, oraDi, quando } from "@/lib/formato";
 import { prenota } from "../actions";
 import { postiLiberi, type LezioneBase } from "../dati";
 
-type Lezione = LezioneBase & { corso_id: string };
+type RegoleCorso = { nome: string; ingressi_clienti: boolean; ingressi_da: string; prenotabile_giorni: number };
+type Lezione = Omit<LezioneBase, "corsi"> & { corso_id: string; corsi: RegoleCorso | null };
 
 const GIORNO = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -14,19 +15,26 @@ export default async function PrenotaPage({ searchParams }: { searchParams: Sear
   const { supabase, profilo } = await richiediUtente();
   const sp = await searchParams;
   const adesso = new Date();
-  const fra7giorni = new Date(adesso.getTime() + 7 * 86_400_000);
+  // Il calendario arriva a 4 settimane: poi ogni corso ha il suo anticipo massimo
+  const fra28giorni = new Date(adesso.getTime() + 29 * 86_400_000);
 
   const [lezioniRes, mieRes] = await Promise.all([
     supabase
       .from("lezioni")
-      .select("id, inizio, capienza, scadenza_conferma, annullata, corso_id, corsi(nome)")
+      .select("id, inizio, capienza, scadenza_conferma, annullata, corso_id, corsi!inner(nome, ingressi_clienti, ingressi_da, prenotabile_giorni, attivo)")
       .eq("annullata", false)
+      .eq("corsi.attivo", true)
+      .eq("corsi.ingressi_clienti", true)
       .gt("inizio", adesso.toISOString())
-      .lt("inizio", fra7giorni.toISOString())
+      .lt("inizio", fra28giorni.toISOString())
       .order("inizio"),
     supabase.from("prenotazioni").select("lezione_id").eq("utente_id", profilo.id).in("stato", ["riservata", "confermata"]),
   ]);
-  const lezioni = (lezioniRes.data ?? []) as unknown as Lezione[];
+  const lezioni = ((lezioniRes.data ?? []) as unknown as Lezione[]).filter(
+    (l) => !!l.corsi && new Date(l.inizio).getTime() <= adesso.getTime() + l.corsi.prenotabile_giorni * 86_400_000,
+  );
+  // "Solo dopo l'orario limite": prima di allora i posti restano agli abbonati
+  const siApre = (l: Lezione) => (l.corsi?.ingressi_da === "dopo_scadenza" && new Date(l.scadenza_conferma) > adesso ? l.scadenza_conferma : null);
   const giaMie = new Set(((mieRes.data ?? []) as { lezione_id: string }[]).map((r) => r.lezione_id));
 
   // Corsi e giorni disponibili
@@ -56,7 +64,7 @@ export default async function PrenotaPage({ searchParams }: { searchParams: Sear
         </Card>
       ) : corsi.length === 0 ? (
         <Card>
-          <p className="text-sm text-slate-600">Nessuna lezione in programma nei prossimi 7 giorni.</p>
+          <p className="text-sm text-slate-600">Nessuna lezione prenotabile dall&apos;app nei prossimi giorni. Per informazioni chiedi in reception.</p>
         </Card>
       ) : (
         <>
@@ -97,6 +105,7 @@ export default async function PrenotaPage({ searchParams }: { searchParams: Sear
             {delGiorno.map((l) => {
               const liberi = liberiIn(l);
               const mia = giaMie.has(l.id);
+              const apertura = siApre(l);
               return (
                 <div
                   key={l.id}
@@ -106,7 +115,10 @@ export default async function PrenotaPage({ searchParams }: { searchParams: Sear
                   <p className={`mb-2 text-xs ${liberi > 0 ? "text-slate-600" : "text-red-700"}`}>
                     {mia ? "✓ Già prenotato" : liberi > 0 ? `${liberi} ${liberi === 1 ? "posto libero" : "posti liberi"}` : "Al completo"}
                   </p>
-                  {!mia && liberi > 0 && (
+                  {!mia && liberi > 0 && apertura && (
+                    <p className="rounded-lg bg-slate-100 px-2 py-2 text-center text-xs text-slate-600">Si prenota da {quando(apertura)}</p>
+                  )}
+                  {!mia && liberi > 0 && !apertura && (
                     <form action={prenota}>
                       <input type="hidden" name="lezione_id" value={l.id} />
                       <input type="hidden" name="torna" value="/area/prenota" />

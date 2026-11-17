@@ -42,3 +42,13 @@ body {
 .spazio-sopra {
   padding-top: env(safe-area-inset-top, 0px);
 }
+
+/* Stampa (ricevute): foglio bianco, margini puliti */
+@media print {
+  body {
+    background: #fff;
+  }
+  @page {
+    margin: 15mm;
+  }
+}

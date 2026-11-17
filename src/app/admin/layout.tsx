@@ -4,11 +4,13 @@ import { richiediStaff } from "@/lib/sessione";
 
 const VOCI: Voce[] = [
   { href: "/admin", testo: "Oggi", icona: "casa" },
+  { href: "/admin/ingresso", testo: "Ingresso", icona: "qr" },
   { href: "/admin/lezioni", testo: "Lezioni", icona: "calendario" },
   { href: "/admin/utenti", testo: "Utenti", icona: "persone" },
   { href: "/admin/abbonamenti", testo: "Abbonamenti", icona: "tessera" },
   { href: "/admin/avvisi", testo: "Avvisi", icona: "campana" },
   // Sul telefono gli orari si aprono dalla pagina Lezioni
+  { href: "/admin/pagamenti", testo: "Pagamenti", icona: "euro", soloComputer: true },
   { href: "/admin/corsi", testo: "Corsi e orari", icona: "calendario", soloComputer: true },
 ];
 

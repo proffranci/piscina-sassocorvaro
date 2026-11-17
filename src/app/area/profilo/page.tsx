@@ -4,7 +4,8 @@ import { BottoneInvio } from "@/components/BottoneInvio";
 import { Avviso, Badge, Card, bottone, bottoneSecondario, campo, etichetta, parametro, type SearchParams } from "@/components/ui";
 import { aggiornaPreferenze, richiediCambio } from "../actions";
 import { richiediUtente } from "@/lib/sessione";
-import { data as formattaData, nomeGiorno, ora } from "@/lib/formato";
+import { data as formattaData, euro, nomeGiorno, ora } from "@/lib/formato";
+import { SELECT_PAGAMENTO, numeroRicevuta, type Pagamento } from "@/lib/pagamenti";
 import { SELECT_ABBONAMENTI, type Abbonamento } from "../dati";
 
 type Orario = { id: string; corso_id: string; giorno_settimana: number; ora_inizio: string; corsi: { nome: string } | null };
@@ -23,7 +24,7 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Sear
   const sp = await searchParams;
   const oggiData = new Date().toISOString().slice(0, 10);
 
-  const [abbRes, orariRes, richiesteRes] = await Promise.all([
+  const [abbRes, orariRes, richiesteRes, pagRes] = await Promise.all([
     supabase.from("abbonamenti").select(SELECT_ABBONAMENTI).gte("data_fine", oggiData).order("data_inizio"),
     supabase.from("orari_corso").select("id, corso_id, giorno_settimana, ora_inizio, corsi(nome)").eq("attivo", true).order("giorno_settimana").order("ora_inizio"),
     supabase
@@ -32,7 +33,9 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Sear
       .eq("utente_id", profilo.id)
       .order("creata_il", { ascending: false })
       .limit(10),
+    supabase.from("pagamenti").select(SELECT_PAGAMENTO).eq("utente_id", profilo.id).eq("annullato", false).order("pagato_il", { ascending: false }).limit(10),
   ]);
+  const pagamenti = (pagRes.data ?? []) as unknown as Pagamento[];
   const abbonamenti = (abbRes.data ?? []) as unknown as Abbonamento[];
   const orari = (orariRes.data ?? []) as unknown as Orario[];
   const richieste = (richiesteRes.data ?? []) as unknown as Richiesta[];
@@ -213,6 +216,27 @@ export default async function ProfiloPage({ searchParams }: { searchParams: Sear
       {abbonamenti.length === 0 && (
         <Card className="mb-8">
           <p className="text-sm text-slate-600">Non hai abbonamenti attivi. Chiedi informazioni in reception.</p>
+        </Card>
+      )}
+
+      {pagamenti.length > 0 && (
+        <Card className="mb-8">
+          <h2 className="mb-3 font-semibold">I tuoi pagamenti</h2>
+          <ul className="divide-y divide-slate-100 text-sm">
+            {pagamenti.map((p) => (
+              <li key={p.id}>
+                <Link href={`/ricevuta/${p.id}`} className="flex min-h-[48px] items-center justify-between gap-2 py-2">
+                  <span>
+                    {p.descrizione}
+                    <span className="block text-xs text-slate-500">
+                      {formattaData(p.pagato_il)} · ricevuta n. {numeroRicevuta(p)}
+                    </span>
+                  </span>
+                  <span className="font-semibold tabular-nums">{euro(p.importo)} 🧾</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </Card>
       )}
 

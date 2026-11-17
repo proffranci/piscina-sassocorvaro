@@ -18,6 +18,8 @@ export type Profilo = {
   creato_il: string;
   nome_utente: string | null;
   deve_cambiare_password: boolean;
+  codice_ingresso: string; // il contenuto del QR personale
+  tessera_rfid: string | null; // tessera o braccialetto collegato
 };
 
 // Chi e l'utente loggato? Restituisce null se nessuno e entrato.

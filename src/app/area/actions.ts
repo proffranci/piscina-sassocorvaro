@@ -101,3 +101,11 @@ export async function richiediCambio(formData: FormData) {
   if (error) esito("errore", messaggioDb(error, "Non sono riuscito a inviare la richiesta."), "/area/profilo");
   esito("ok", "Richiesta inviata alla reception: riceverai la risposta tra gli Avvisi.", "/area/profilo");
 }
+
+// Nuovo QR personale (quello vecchio non funziona più)
+export async function rigeneraMioQr() {
+  const { supabase } = await richiediUtente();
+  const { error } = await supabase.rpc("rigenera_codice_ingresso", { p_utente: null });
+  if (error) esito("errore", messaggioDb(error, "Operazione non riuscita."), "/area/tessera");
+  esito("ok", "Nuovo QR pronto: usa questo da ora in poi.", "/area/tessera");
+}
