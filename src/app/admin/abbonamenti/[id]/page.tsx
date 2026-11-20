@@ -6,9 +6,9 @@ import { RichiestaCambio, SELECT_RICHIESTE, type RichiestaStaff } from "@/compon
 import { BottoneWhatsApp, testiWhatsApp } from "@/components/WhatsApp";
 import { Avviso, Badge, Card, Titolo, bottone, bottoneSecondario, campo, etichetta, parametro, type SearchParams } from "@/components/ui";
 import { richiediStaff } from "@/lib/sessione";
-import { data as formattaData, euro, nomeGiorno, nomeMetodo, oggiItalia, ora } from "@/lib/formato";
+import { data as formattaData, euro, nomeGiorno, nomeMetodo, oggiItalia, ora, oraDi } from "@/lib/formato";
 import { SELECT_PAGAMENTO, numeroRicevuta, statoPagamento, type Pagamento } from "@/lib/pagamenti";
-import { cambiaGiorno } from "../actions";
+import { cambiaGiorno, chiudiAbbonamento, eliminaAbbonamento } from "../actions";
 import { annullaPagamento, registraPagamento, salvaPrezzo, verificaPagamento } from "../../pagamenti/actions";
 import { BadgePagamento } from "@/components/BadgePagamento";
 
@@ -21,8 +21,10 @@ type Abbonamento = {
   pagato: boolean;
   prezzo: number | string | null;
   pagare_entro: string | null;
+  ingressi_totali: number | null;
   note: string | null;
   utente_id: string;
+  corsi: { nome: string } | null;
   profili: { nome: string; cognome: string; telefono: string | null } | null;
   abbonamenti_orari: { orari_corso: Orario | null }[];
 };
@@ -39,18 +41,21 @@ export default async function SchedaAbbonamento({
   const admin = profilo.ruolo === "admin";
   const sp = await searchParams;
 
-  const [abbRes, orariRes, richiesteRes, pagRes] = await Promise.all([
+  const [abbRes, orariRes, richiesteRes, pagRes, usatiRes] = await Promise.all([
     supabase
       .from("abbonamenti")
       .select(
-        "id, tipo, data_inizio, data_fine, pagato, prezzo, pagare_entro, note, utente_id, profili(nome, cognome, telefono), abbonamenti_orari(orari_corso(id, corso_id, giorno_settimana, ora_inizio, corsi(nome)))",
+        "id, tipo, data_inizio, data_fine, pagato, prezzo, pagare_entro, ingressi_totali, note, utente_id, corsi(nome), profili(nome, cognome, telefono), abbonamenti_orari(orari_corso(id, corso_id, giorno_settimana, ora_inizio, corsi(nome)))",
       )
       .eq("id", id)
       .maybeSingle(),
     supabase.from("orari_corso").select("id, corso_id, giorno_settimana, ora_inizio, corsi(nome)").eq("attivo", true).order("giorno_settimana").order("ora_inizio"),
     supabase.from("richieste_cambio").select(SELECT_RICHIESTE).eq("abbonamento_id", id).eq("stato", "in_attesa"),
     supabase.from("pagamenti").select(SELECT_PAGAMENTO).eq("abbonamento_id", id).order("pagato_il").order("numero"),
+    // Carnet: gli ingressi già usati
+    supabase.from("ingressi").select("id, creato_il").eq("carnet_id", id).order("creato_il", { ascending: false }),
   ]);
+  const usati = (usatiRes.data ?? []) as { id: number; creato_il: string }[];
   const pagamenti = (pagRes.data ?? []) as unknown as Pagamento[];
   const a = abbRes.data as unknown as Abbonamento | null;
   if (!a) notFound();
@@ -65,6 +70,8 @@ export default async function SchedaAbbonamento({
   const alternative = orari.filter((o) => o.corso_id === miei[0]?.corso_id && !mieiId.has(o.id));
   const scaduto = a.data_fine < new Date().toISOString().slice(0, 10);
   const pagina = `/admin/abbonamenti/${a.id}`;
+  const carnet = a.ingressi_totali !== null;
+  const oggi = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Rome" });
   const { stato, verificato, inAttesa, prezzo, residuo, urgente } = statoPagamento({ ...a, pagamenti });
 
   return (
@@ -80,8 +87,14 @@ export default async function SchedaAbbonamento({
             <div>
               <p className="text-lg font-semibold">{a.tipo}</p>
               <p className="text-sm text-slate-600">
-                Dal {formattaData(a.data_inizio)} al {formattaData(a.data_fine)}
+                {carnet ? "Valido dal" : "Dal"} {formattaData(a.data_inizio)} al {formattaData(a.data_fine)}
               </p>
+              {carnet && (
+                <p className="mt-1 text-sm">
+                  🎟️ <strong>{a.ingressi_totali! - usati.length}</strong> ingressi rimasti su {a.ingressi_totali}
+                  {a.corsi ? ` · ${a.corsi.nome}` : ""}
+                </p>
+              )}
             </div>
             <div className="flex flex-col items-end gap-1">
               {scaduto && <Badge>scaduto</Badge>}
@@ -206,6 +219,71 @@ export default async function SchedaAbbonamento({
           </details>
         </Card>
 
+        {carnet && (
+          <Card className="lg:col-span-2">
+            <h2 className="mb-2 font-semibold">Ingressi usati</h2>
+            {usati.length === 0 ? (
+              <p className="text-sm text-slate-500">Ancora nessuno.</p>
+            ) : (
+              <ul className="grid gap-1 text-sm sm:grid-cols-2">
+                {usati.map((u, i) => (
+                  <li key={u.id}>
+                    {usati.length - i}. {formattaData(u.creato_il)} alle {oraDi(u.creato_il)}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        )}
+
+        {/* ---------- Chiudi / elimina ---------- */}
+        <Card className="lg:col-span-2">
+          <h2 className="mb-3 font-semibold">Chiudere o eliminare</h2>
+          <div className="grid gap-4 md:grid-cols-2">
+            {!scaduto && (
+              <form action={chiudiAbbonamento} className="space-y-3 rounded-xl bg-slate-50 p-4">
+                <input type="hidden" name="abbonamento_id" value={a.id} />
+                <p className="font-medium">Chiudi in anticipo</p>
+                <p className="text-xs text-slate-600">
+                  Resta nello storico con i suoi pagamenti; dopo l&apos;ultimo giorno i posti riservati si liberano.
+                </p>
+                <label className="block text-xs text-slate-600" htmlFor="ultimo_giorno">
+                  Ultimo giorno valido
+                </label>
+                <input
+                  id="ultimo_giorno"
+                  name="ultimo_giorno"
+                  type="date"
+                  required
+                  min={a.data_inizio}
+                  max={a.data_fine}
+                  defaultValue={oggi < a.data_inizio ? a.data_inizio : oggi}
+                  className={campo}
+                />
+                <input name="motivo" placeholder="Motivo (facoltativo)" className={campo} />
+                <BottoneInvio className={`${bottoneSecondario} w-full`}>Chiudi abbonamento</BottoneInvio>
+              </form>
+            )}
+            {admin && (
+              <form action={eliminaAbbonamento} className="space-y-3 rounded-xl border border-red-200 bg-red-50 p-4">
+                <input type="hidden" name="abbonamento_id" value={a.id} />
+                <p className="font-medium text-red-800">Elimina (per gli errori)</p>
+                <p className="text-xs text-red-800">
+                  Sparisce del tutto e i suoi posti futuri si liberano. Le ricevute restano in Pagamenti. Non si può annullare.
+                </p>
+                <label className="flex items-start gap-2 text-sm">
+                  <input type="checkbox" name="conferma" value="si" required className="mt-1" />
+                  Sì, elimina questo {carnet ? "carnet" : "abbonamento"}
+                </label>
+                <BottoneInvio className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-red-700 px-4 text-sm font-semibold text-white hover:bg-red-800">
+                  Elimina definitivamente
+                </BottoneInvio>
+              </form>
+            )}
+          </div>
+        </Card>
+
+        {!carnet && (
         <Card className="lg:col-span-2">
           <h2 className="mb-1 font-semibold">Giorni fissi</h2>
           <p className="mb-4 text-sm text-slate-600">
@@ -235,6 +313,7 @@ export default async function SchedaAbbonamento({
             ))}
           </div>
         </Card>
+        )}
       </div>
     </>
   );

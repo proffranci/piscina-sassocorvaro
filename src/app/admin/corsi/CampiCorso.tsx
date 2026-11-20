@@ -17,10 +17,14 @@ export type ImpostazioniCorso = {
   prenotabile_giorni: number;
   prezzo_ingresso: number | null;
   prezzo_abbonamento: number | null;
+  usa_corsie: boolean;
+  corsie_max: number;
+  persone_per_corsia: number;
+  abbonabile: boolean;
 };
 
 export const SELECT_IMPOSTAZIONI =
-  "nome, descrizione, capienza, giorni_abbonamento, durata_predefinita, scadenza_modo, scadenza_ora, scadenza_ore_prima, scadenza_giorni_prima, disdetta_ore_prima, ingressi_clienti, ingressi_da, prenotabile_giorni, prezzo_ingresso, prezzo_abbonamento";
+  "nome, descrizione, capienza, giorni_abbonamento, durata_predefinita, scadenza_modo, scadenza_ora, scadenza_ore_prima, scadenza_giorni_prima, disdetta_ore_prima, ingressi_clienti, ingressi_da, prenotabile_giorni, prezzo_ingresso, prezzo_abbonamento, usa_corsie, corsie_max, persone_per_corsia, abbonabile";
 
 export const CORSO_NUOVO: ImpostazioniCorso = {
   nome: "",
@@ -32,12 +36,16 @@ export const CORSO_NUOVO: ImpostazioniCorso = {
   scadenza_ora: "17:00",
   scadenza_ore_prima: 2,
   scadenza_giorni_prima: 1,
-  disdetta_ore_prima: 0,
+  disdetta_ore_prima: 2,
   ingressi_clienti: true,
   ingressi_da: "subito",
   prenotabile_giorni: 7,
   prezzo_ingresso: null,
   prezzo_abbonamento: null,
+  usa_corsie: false,
+  corsie_max: 5,
+  persone_per_corsia: 7,
+  abbonabile: true,
 };
 
 const prezzo = (v: number | null) => (v === null || v === undefined ? "" : String(v).replace(".", ","));
@@ -63,6 +71,7 @@ export function CampiCorso({ id, c }: { id: string; c: ImpostazioniCorso }) {
         <div>
           <label className={etichetta} htmlFor={`cap-${id}`}>Posti per lezione</label>
           <input id={`cap-${id}`} name="capienza" type="number" min={1} max={500} required defaultValue={c.capienza} className={campo} />
+          <p className="mt-1 text-xs text-slate-500">Per i corsi a corsie i posti si calcolano dalle corsie (vedi sotto).</p>
         </div>
         <div>
           <label className={etichetta} htmlFor={`dur-${id}`}>Durata di una lezione (minuti)</label>
@@ -71,9 +80,33 @@ export function CampiCorso({ id, c }: { id: string; c: ImpostazioniCorso }) {
         </div>
       </div>
 
+      {/* ---------- Corsie ---------- */}
+      <div className={`${sezione} grid gap-4 sm:grid-cols-3`}>
+        <p className={`${titolo} sm:col-span-3`}>Corsie (es. nuoto libero)</p>
+        <label className="flex items-start gap-2 text-sm sm:col-span-3">
+          <input type="checkbox" name="usa_corsie" defaultChecked={c.usa_corsie} className="mt-1" />
+          Il corso si fa a corsie: posti = corsie aperte × persone per corsia
+        </label>
+        <div>
+          <label className={etichetta} htmlFor={`cm-${id}`}>Corsie della vasca</label>
+          <input id={`cm-${id}`} name="corsie_max" type="number" min={1} max={10} defaultValue={c.corsie_max} className={campo} />
+        </div>
+        <div>
+          <label className={etichetta} htmlFor={`ppc-${id}`}>Persone per corsia</label>
+          <input id={`ppc-${id}`} name="persone_per_corsia" type="number" min={1} max={10} defaultValue={c.persone_per_corsia} className={campo} />
+        </div>
+        <p className="self-end text-xs text-slate-500">
+          Quante corsie sono aperte si decide in ogni orario della settimana e, se serve, nella singola lezione.
+        </p>
+      </div>
+
       {/* ---------- Abbonati ---------- */}
       <div className={`${sezione} grid gap-4 sm:grid-cols-2`}>
         <p className={`${titolo} sm:col-span-2`}>Abbonati</p>
+        <label className="flex items-start gap-2 text-sm sm:col-span-2">
+          <input type="checkbox" name="abbonabile" defaultChecked={c.abbonabile} className="mt-1" />
+          Si fanno abbonamenti a giorni fissi (togli la spunta per il nuoto libero: solo ingressi singoli o carnet)
+        </label>
         <div>
           <label className={etichetta} htmlFor={`gg-abb-${id}`}>Giorni fissi nell&apos;abbonamento</label>
           <input id={`gg-abb-${id}`} name="giorni_abbonamento" type="number" min={1} max={7} defaultValue={c.giorni_abbonamento} className={campo} />

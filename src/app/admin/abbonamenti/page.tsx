@@ -19,6 +19,8 @@ type Riga = {
   pagamenti: PagamentoBreve[];
   note: string | null;
   profili: { nome: string; cognome: string; email: string | null; telefono: string | null } | null;
+  ingressi_totali: number | null;
+  ingressi: { count: number }[];
   abbonamenti_orari: {
     orari_corso: { giorno_settimana: number; ora_inizio: string; corsi: { nome: string } | null } | null;
   }[];
@@ -33,7 +35,7 @@ export default async function AbbonamentiPage({ searchParams }: { searchParams: 
   let query = supabase
     .from("abbonamenti")
     .select(
-      `id, tipo, data_inizio, data_fine, pagato, prezzo, pagare_entro, note, ${SELECT_PAGAMENTI_ABB}, profili(nome, cognome, email, telefono), abbonamenti_orari(orari_corso(giorno_settimana, ora_inizio, corsi(nome)))`,
+      `id, tipo, data_inizio, data_fine, pagato, prezzo, pagare_entro, ingressi_totali, ingressi(count), note, ${SELECT_PAGAMENTI_ABB}, profili(nome, cognome, email, telefono), abbonamenti_orari(orari_corso(giorno_settimana, ora_inizio, corsi(nome)))`,
     )
     .order("data_fine", { ascending: true });
   if (!mostraScaduti) query = query.gte("data_fine", oggi);
@@ -47,6 +49,7 @@ export default async function AbbonamentiPage({ searchParams }: { searchParams: 
         azione={
           <div className="flex gap-2">
             <Link href="/admin/pagamenti" className={bottoneSecondario}>💶 Pagamenti e ricevute</Link>
+            <Link href="/admin/abbonamenti/nuovo?tipo=carnet" className={bottoneSecondario}>🎟️ Nuovo carnet</Link>
             <Link href="/admin/abbonamenti/nuovo" className={bottone}>+ Nuovo abbonamento</Link>
           </div>
         }
@@ -85,7 +88,12 @@ export default async function AbbonamentiPage({ searchParams }: { searchParams: 
                   <Link href={`/admin/abbonamenti/${a.id}`} className="font-semibold text-vasca underline">
                     {a.profili ? `${a.profili.cognome} ${a.profili.nome}` : "Utente eliminato"}
                   </Link>
-                  <p className="text-sm text-slate-600">{a.tipo}</p>
+                  <p className="text-sm text-slate-600">
+                    {a.tipo}
+                    {a.ingressi_totali !== null && (
+                      <strong className="ml-1">· 🎟️ restano {a.ingressi_totali - (a.ingressi?.[0]?.count ?? 0)}/{a.ingressi_totali}</strong>
+                    )}
+                  </p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   {scaduto && <Badge>scaduto</Badge>}

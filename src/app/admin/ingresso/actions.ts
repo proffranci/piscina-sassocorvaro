@@ -31,6 +31,8 @@ export async function confermaIngresso(s: SceltaIngresso): Promise<Registrato | 
     p_metodo: s.metodo || null,
     p_nota: s.nota?.slice(0, 200) || null,
     p_forza: !!s.forza,
+    p_carnet: s.carnet || null,
+    p_corsia: s.corsia ?? null,
   });
   if (error) return { errore: messaggioDb(error, "Ingresso non registrato, riprova.") };
   revalidatePath("/admin/ingresso");

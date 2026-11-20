@@ -20,7 +20,11 @@ export function CampiScadenza({
 }) {
   return (
     <fieldset className="grid gap-3 sm:grid-cols-3">
-      <legend className={`${etichetta} sm:col-span-3`}>Orario limite per confermare (poi il posto si libera)</legend>
+      <legend className={`${etichetta} sm:col-span-3`}>Entro quando l&apos;abbonato deve confermare che viene</legend>
+      <p className="-mt-1 text-xs text-slate-500 sm:col-span-3">
+        Il posto dell&apos;abbonato è tenuto da parte fino a quest&apos;ora. Se non conferma, il posto si libera per chi vuole fare un
+        ingresso singolo.
+      </p>
       <div className="sm:col-span-3">
         <select name="scadenza_modo" defaultValue={modo ?? ""} className={campo} aria-label="Tipo di scadenza" id={`modo-${id}`}>
           {conEreditata && <option value="">Come il corso</option>}

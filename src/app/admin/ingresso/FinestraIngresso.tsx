@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { bottone, bottoneSecondario, campo } from "@/components/ui";
 import { METODI_PAGAMENTO, euro } from "@/lib/formato";
-import { ESITI, type Controllo, type LezioneOggi, type Registrato } from "@/lib/ingresso";
+import { ESITI, type Controllo, type Corsia, type LezioneOggi, type Registrato } from "@/lib/ingresso";
 import { confermaIngresso } from "./actions";
 
 const STATI: Record<LezioneOggi["stato"], string> = {
@@ -40,7 +40,12 @@ export function FinestraIngresso({
   const [motivo, setMotivo] = useState<"lezione" | "singolo" | "altro">(diAdesso ? "lezione" : proposte.length > 0 ? "singolo" : "altro");
   const [lezione, setLezione] = useState(diAdesso?.lezione_id ?? prenotabili[0]?.lezione_id ?? "");
   const [singolo, setSingolo] = useState(proposte[0]?.lezione_id ?? "");
-  const [pagaOra, setPagaOra] = useState(true);
+  // Come paga l'ingresso singolo: carnet (se ne ha uno valido), adesso, o dopo
+  const carnetPer = (corsoId?: string) =>
+    (c.abbonamenti ?? []).find((a) => a.carnet && (a.rimasti ?? 0) > 0 && (!a.corso_id || a.corso_id === corsoId));
+  const [pagamento, setPagamento] = useState<"carnet" | "ora" | "dopo">(carnetPer(proposte[0]?.corso_id) ? "carnet" : "ora");
+  const pagaOra = pagamento === "ora";
+  const [corsia, setCorsia] = useState<number | null>(null);
   const [metodo, setMetodo] = useState("contanti");
   const [importo, setImporto] = useState(proposte[0]?.prezzo ? String(proposte[0].prezzo).replace(".", ",") : "");
   const [nota, setNota] = useState("");
@@ -57,9 +62,17 @@ export function FinestraIngresso({
 
   const scegliSingolo = (id: string) => {
     setSingolo(id);
+    setCorsia(null);
     const p = proposte.find((x) => x.lezione_id === id);
     setImporto(p?.prezzo ? String(p.prezzo).replace(".", ",") : "");
+    setPagamento(carnetPer(p?.corso_id) ? "carnet" : "ora");
   };
+
+  // Corsie della lezione scelta (solo nuoto libero e corsi a corsie)
+  const propostaScelta = proposte.find((p) => p.lezione_id === singolo);
+  const corsieScelte: Corsia[] | null =
+    motivo === "lezione" ? (prenotabili.find((l) => l.lezione_id === lezione)?.corsie ?? null) : motivo === "singolo" ? (propostaScelta?.corsie ?? null) : null;
+  const carnetScelto = motivo === "singolo" ? carnetPer(propostaScelta?.corso_id) : undefined;
 
   const conferma = async () => {
     setErrore(null);
@@ -71,6 +84,8 @@ export function FinestraIngresso({
         lezione: motivo === "lezione" ? lezione : motivo === "singolo" ? singolo : null,
         importo: motivo === "singolo" && pagaOra ? importo : null,
         metodo: motivo === "singolo" && pagaOra ? metodo : null,
+        carnet: motivo === "singolo" && pagamento === "carnet" && carnetScelto ? carnetScelto.id : null,
+        corsia: corsieScelte ? corsia : null,
         nota: nota || null,
         forza,
       });
@@ -138,6 +153,7 @@ export function FinestraIngresso({
                   <li key={l.prenotazione_id} className={l.finita ? "text-slate-400" : ""}>
                     <strong className="tabular-nums">{l.ora}</strong> {l.corso} · {STATI[l.stato]}
                     {l.tipo === "ingresso_singolo" && " · ingresso singolo"}
+                    {l.corsia && ` · corsia ${l.corsia}`}
                     {l.entrato_il && " · ✓ già entrato"}
                     {l.adesso && !l.entrato_il && <span className="ml-1 rounded bg-acqua px-1.5 text-xs text-white">adesso</span>}
                   </li>
@@ -183,10 +199,22 @@ export function FinestraIngresso({
                       </option>
                     ))}
                   </select>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={pagaOra} onChange={(e) => setPagaOra(e.target.checked)} />
-                    Paga adesso (fa la ricevuta)
-                  </label>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                    {carnetScelto && (
+                      <label className="flex items-center gap-1.5">
+                        <input type="radio" name="pagamento" checked={pagamento === "carnet"} onChange={() => setPagamento("carnet")} />
+                        🎟️ Dal carnet (restano {carnetScelto.rimasti})
+                      </label>
+                    )}
+                    <label className="flex items-center gap-1.5">
+                      <input type="radio" name="pagamento" checked={pagamento === "ora"} onChange={() => setPagamento("ora")} />
+                      Paga adesso
+                    </label>
+                    <label className="flex items-center gap-1.5">
+                      <input type="radio" name="pagamento" checked={pagamento === "dopo"} onChange={() => setPagamento("dopo")} />
+                      Paga dopo
+                    </label>
+                  </div>
                   {pagaOra && (
                     <div className="grid grid-cols-2 gap-2">
                       <input
@@ -210,6 +238,26 @@ export function FinestraIngresso({
                 </div>
               )}
             </label>
+
+            {/* Corsia (nuoto libero): facoltativa */}
+            {corsieScelte && corsieScelte.length > 0 && (
+              <div className="rounded-xl border border-slate-200 p-3">
+                <p className="mb-2 text-sm font-medium">Corsia (facoltativa)</p>
+                <div className="flex flex-wrap gap-2">
+                  {corsieScelte.map((k) => (
+                    <button
+                      key={k.n}
+                      type="button"
+                      onClick={() => setCorsia(corsia === k.n ? null : k.n)}
+                      className={`min-h-[44px] min-w-[64px] rounded-lg border px-2 text-sm ${corsia === k.n ? "border-acqua bg-acqua text-white" : "border-slate-300 bg-white"}`}
+                    >
+                      <span className="block font-semibold">{k.n}</span>
+                      <span className="block text-xs opacity-80">{k.persone} dentro</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <label className={opzione(motivo === "altro")}>
               <span className="flex items-center gap-2 font-medium">

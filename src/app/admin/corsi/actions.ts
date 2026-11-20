@@ -41,6 +41,10 @@ function leggiCorso(formData: FormData): { dati: Record<string, unknown> } | { e
   if (!(Number.isInteger(disdetta) && disdetta >= 0 && disdetta <= 72)) return { errore: "Limite per disdire: da 0 a 72 ore." };
   if (!(Number.isInteger(prenotabile) && prenotabile >= 1 && prenotabile <= 60)) return { errore: "Anticipo per gli ingressi: da 1 a 60 giorni." };
   if (!scadenza) return { errore: "Orario limite per confermare non valido." };
+  const corsieMax = Number(testo(formData, "corsie_max") || 5);
+  const perCorsia = Number(testo(formData, "persone_per_corsia") || 7);
+  if (!(Number.isInteger(corsieMax) && corsieMax >= 1 && corsieMax <= 10)) return { errore: "Corsie: da 1 a 10." };
+  if (!(Number.isInteger(perCorsia) && perCorsia >= 1 && perCorsia <= 10)) return { errore: "Persone per corsia: da 1 a 10." };
   if (prezzoIngresso && pi === null) return { errore: "Prezzo dell'ingresso non valido." };
   if (prezzoAbbonamento && pa === null) return { errore: "Prezzo dell'abbonamento non valido." };
 
@@ -57,6 +61,10 @@ function leggiCorso(formData: FormData): { dati: Record<string, unknown> } | { e
       prenotabile_giorni: prenotabile,
       prezzo_ingresso: pi,
       prezzo_abbonamento: pa,
+      usa_corsie: formData.get("usa_corsie") === "on",
+      corsie_max: corsieMax,
+      persone_per_corsia: perCorsia,
+      abbonabile: formData.get("abbonabile") === "on",
       ...scadenza,
     },
   };
@@ -205,18 +213,40 @@ export async function aggiornaOrario(formData: FormData) {
   const { supabase } = await richiediStaff();
   const id = testo(formData, "id");
   const pagina = `/admin/corsi/orari/${id}`;
+  const giorno = Number(testo(formData, "giorno_settimana"));
+  const oraInizio = testo(formData, "ora_inizio");
   const durata = Number(testo(formData, "durata_minuti"));
   const capTesto = testo(formData, "capienza");
   const capienza = capTesto ? Number(capTesto) : null;
+  const corsieTesto = testo(formData, "corsie");
+  const corsie = corsieTesto ? Number(corsieTesto) : null;
   const scadenza = leggiScadenza(formData, false);
 
+  if (!(giorno >= 1 && giorno <= 7) || !ORA.test(oraInizio)) esito("errore", "Giorno o ora non validi.", pagina);
   if (!(durata >= 15 && durata <= 240)) esito("errore", "Durata non valida (da 15 a 240 minuti).", pagina);
   if (capienza !== null && !(Number.isInteger(capienza) && capienza > 0 && capienza <= 500)) esito("errore", "Posti non validi.", pagina);
+  if (corsie !== null && !(Number.isInteger(corsie) && corsie >= 1 && corsie <= 10)) esito("errore", "Corsie non valide.", pagina);
   if (!scadenza) esito("errore", "Scadenza non valida.", pagina);
 
-  const { error } = await supabase.from("orari_corso").update({ durata_minuti: durata, capienza, ...scadenza }).eq("id", id);
+  // Giorno o ora diversi: lo spostiamo (le lezioni future si rifanno al nuovo orario)
+  const { data: prima } = await supabase.from("orari_corso").select("giorno_settimana, ora_inizio").eq("id", id).maybeSingle();
+  if (!prima) esito("errore", "Orario non trovato.", PAGINA);
+  let avvisati = 0;
+  if (prima.giorno_settimana !== giorno || String(prima.ora_inizio).slice(0, 5) !== oraInizio) {
+    const { data, error } = await supabase.rpc("sposta_orario", { p_orario: id, p_giorno: giorno, p_ora: oraInizio, p_durata: durata });
+    if (error) esito("errore", messaggioDb(error, "Spostamento non riuscito."), pagina);
+    avvisati = Number(data ?? 0);
+  }
+
+  const { error } = await supabase.from("orari_corso").update({ durata_minuti: durata, capienza, corsie, ...scadenza }).eq("id", id);
   if (error) esito("errore", messaggioDb(error, "Salvataggio non riuscito."), pagina);
-  esito("ok", "Orario aggiornato: le sue lezioni in calendario si sono aggiornate.", pagina);
+  esito(
+    "ok",
+    avvisati > 0
+      ? `Orario spostato e aggiornato: ${avvisati} prenotati avvisati del cambio.`
+      : "Orario aggiornato: le sue lezioni in calendario si sono aggiornate.",
+    pagina,
+  );
 }
 
 // Sospendi = annulla le lezioni future (avvisando chi è prenotato). Riattiva = le rimette.

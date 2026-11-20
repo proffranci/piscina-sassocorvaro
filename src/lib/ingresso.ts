@@ -4,6 +4,9 @@
 
 export type Esito = "ok" | "attenzione" | "negato" | "forzato" | "scegli";
 
+// Persone già assegnate a ogni corsia (solo corsi a corsie)
+export type Corsia = { n: number; persone: number };
+
 export type LezioneOggi = {
   prenotazione_id: string;
   lezione_id: string;
@@ -14,9 +17,20 @@ export type LezioneOggi = {
   entrato_il: string | null;
   adesso: boolean;
   finita: boolean;
+  corso_id: string;
+  corsia: number | null;
+  corsie: Corsia[] | null;
 };
 
-export type Proposta = { lezione_id: string; corso: string; ora: string; liberi: number; prezzo: number | null };
+export type Proposta = {
+  lezione_id: string;
+  corso: string;
+  corso_id: string;
+  ora: string;
+  liberi: number;
+  prezzo: number | null;
+  corsie: Corsia[] | null;
+};
 
 export type Controllo = {
   trovato: boolean;
@@ -27,7 +41,17 @@ export type Controllo = {
   attivo?: boolean;
   avvisi: string[];
   info?: string[];
-  abbonamenti?: { id: string; tipo: string; data_fine: string; stato: string; pagare_entro: string; residuo: number | null }[];
+  abbonamenti?: {
+    id: string;
+    tipo: string;
+    data_fine: string;
+    stato: string;
+    pagare_entro: string;
+    residuo: number | null;
+    carnet: boolean;
+    rimasti: number | null;
+    corso_id: string | null;
+  }[];
   lezioni_oggi?: LezioneOggi[];
   prossima?: string | null;
   proposte_singolo?: Proposta[];
@@ -50,6 +74,8 @@ export type SceltaIngresso = {
   metodo?: string | null; // pieno = paga adesso
   nota?: string | null;
   forza?: boolean;
+  carnet?: string | null; // scala un ingresso da questo carnet
+  corsia?: number | null;
 };
 
 export type RigaIngresso = {

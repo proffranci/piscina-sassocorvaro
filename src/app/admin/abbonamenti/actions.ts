@@ -98,6 +98,91 @@ export async function creaAbbonamento(formData: FormData) {
   redirect(`/admin/abbonamenti/${nuovo.id}?ok=${encodeURIComponent(messaggio)}`);
 }
 
+// Carnet: N ingressi da usare quando si vuole (es. nuoto libero), senza giorni fissi
+export async function creaCarnet(formData: FormData) {
+  const { supabase } = await richiediStaff();
+  const corsoId = testo(formData, "corso_id");
+  const pagina = `/admin/abbonamenti/nuovo?tipo=carnet${corsoId ? `&corso=${corsoId}` : ""}`;
+  const utenteId = testo(formData, "utente_id");
+  const tipo = testo(formData, "tipo");
+  const ingressi = Number(testo(formData, "ingressi_totali"));
+  const dataInizio = testo(formData, "data_inizio");
+  const dataFine = testo(formData, "data_fine");
+  const pagareEntro = DATA.test(testo(formData, "pagare_entro")) ? testo(formData, "pagare_entro") : null;
+  const prezzo = leggiImporto(testo(formData, "prezzo"));
+  const pagamento = testo(formData, "importo") ? leggiPagamento(formData) : null;
+
+  if (!utenteId || !tipo) errore(pagina, "Scegli il cliente e scrivi il nome del carnet.");
+  if (!(Number.isInteger(ingressi) && ingressi >= 1 && ingressi <= 200)) errore(pagina, "Numero di ingressi non valido (da 1 a 200).");
+  if (!DATA.test(dataInizio) || !DATA.test(dataFine) || dataFine < dataInizio) errore(pagina, "Date non valide.");
+  if (prezzo === null) errore(pagina, "Scrivi il prezzo del carnet.");
+  if (pagamento && "errore" in pagamento) errore(pagina, pagamento.errore);
+
+  const { data: nuovo, error } = await supabase
+    .from("abbonamenti")
+    .insert({
+      utente_id: utenteId,
+      tipo,
+      data_inizio: dataInizio,
+      data_fine: dataFine,
+      prezzo,
+      pagare_entro: pagareEntro,
+      ingressi_totali: ingressi,
+      corso_id: corsoId || null,
+      note: testo(formData, "note") || null,
+    })
+    .select("id")
+    .single();
+  if (error || !nuovo) errore(pagina, "Non sono riuscito a salvare il carnet.");
+
+  if (pagamento && !("errore" in pagamento)) {
+    const { data: idPagamento, error: errorePagamento } = await supabase.rpc("registra_pagamento", {
+      p_utente: null,
+      p_intestatario: null,
+      p_abbonamento: nuovo.id,
+      p_descrizione: null,
+      p_importo: pagamento.importo,
+      p_metodo: pagamento.metodo,
+      p_data: pagamento.data,
+      p_note: pagamento.note,
+    });
+    if (errorePagamento || !idPagamento) {
+      errore(`/admin/abbonamenti/${nuovo.id}`, `Carnet creato, ma il pagamento non è stato registrato: ${messaggioDb(errorePagamento, "riprova qui.")}`);
+    }
+    redirect(`/ricevuta/${idPagamento}?torna=${encodeURIComponent(`/admin/abbonamenti/${nuovo.id}`)}&nuova=1`);
+  }
+  redirect(`/admin/abbonamenti/${nuovo.id}?ok=${encodeURIComponent(`Carnet da ${ingressi} ingressi creato.`)}`);
+}
+
+// Chiude in anticipo: resta nello storico, i posti dopo l'ultimo giorno si liberano
+export async function chiudiAbbonamento(formData: FormData) {
+  const { supabase } = await richiediStaff();
+  const id = testo(formData, "abbonamento_id");
+  const pagina = `/admin/abbonamenti/${id}`;
+  const ultimo = testo(formData, "ultimo_giorno");
+  if (!DATA.test(ultimo)) errore(pagina, "Scegli l'ultimo giorno valido.");
+  const { data, error } = await supabase.rpc("chiudi_abbonamento", {
+    p_abbonamento: id,
+    p_ultimo_giorno: ultimo,
+    p_motivo: testo(formData, "motivo") || null,
+  });
+  if (error) errore(pagina, messaggioDb(error, "Chiusura non riuscita."));
+  const n = Number(data ?? 0);
+  redirect(`${pagina}?ok=${encodeURIComponent(`Abbonamento chiuso${n > 0 ? `: ${n} posti futuri liberati` : ""}.`)}`);
+}
+
+// Elimina del tutto (per gli errori): solo admin, le ricevute restano
+export async function eliminaAbbonamento(formData: FormData) {
+  const { supabase, profilo } = await richiediStaff();
+  const id = testo(formData, "abbonamento_id");
+  const pagina = `/admin/abbonamenti/${id}`;
+  if (profilo.ruolo !== "admin") errore(pagina, "Solo un amministratore può eliminare un abbonamento.");
+  if (testo(formData, "conferma") !== "si") errore(pagina, "Spunta la conferma per eliminare.");
+  const { error } = await supabase.rpc("elimina_abbonamento", { p_abbonamento: id });
+  if (error) errore(pagina, messaggioDb(error, "Eliminazione non riuscita."));
+  redirect(`/admin/abbonamenti?ok=${encodeURIComponent("Abbonamento eliminato: i suoi posti futuri sono liberi, le ricevute restano in Pagamenti.")}`);
+}
+
 const RITORNI_CAMBIO = ["/admin", "/admin/abbonamenti"];
 
 // Lo staff cambia direttamente uno dei 2 giorni fissi

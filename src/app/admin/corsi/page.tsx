@@ -2,7 +2,7 @@ import Link from "next/link";
 import { BottoneInvio } from "@/components/BottoneInvio";
 import { Avviso, Badge, Card, Titolo, bottone, bottoneSecondario, campo, parametro, type SearchParams } from "@/components/ui";
 import { richiediStaff } from "@/lib/sessione";
-import { descriviScadenza, euro, ora } from "@/lib/formato";
+import { descriviScadenza, esempioScadenza, euro, ora } from "@/lib/formato";
 import { aggiornaCorso, aggiungiOrari, attivaCorso, creaCorso, eliminaCorso } from "./actions";
 import { CORSO_NUOVO, CampiCorso, CampiTurni, SELECT_IMPOSTAZIONI, type ImpostazioniCorso } from "./CampiCorso";
 
@@ -13,6 +13,7 @@ type Orario = {
   durata_minuti: number;
   attivo: boolean;
   capienza: number | null;
+  corsie: number | null;
   scadenza_modo: string | null;
 };
 type Corso = ImpostazioniCorso & {
@@ -30,7 +31,7 @@ export default async function CorsiPage({ searchParams }: { searchParams: Search
 
   const { data } = await supabase
     .from("corsi")
-    .select(`id, attivo, ${SELECT_IMPOSTAZIONI}, orari_corso(id, giorno_settimana, ora_inizio, durata_minuti, attivo, capienza, scadenza_modo)`)
+    .select(`id, attivo, ${SELECT_IMPOSTAZIONI}, orari_corso(id, giorno_settimana, ora_inizio, durata_minuti, attivo, capienza, corsie, scadenza_modo)`)
     .order("nome");
   const corsi = (data ?? []) as unknown as Corso[];
   const aperto = parametro(params.corso);
@@ -75,12 +76,19 @@ export default async function CorsiPage({ searchParams }: { searchParams: Search
                     {!corso.attivo && <Badge>sospeso</Badge>}
                   </h2>
                   <p className="text-sm text-slate-600">
-                    {attivi} orari attivi · {corso.capienza} posti · conferma{" "}
-                    {descriviScadenza(corso.scadenza_modo, corso.scadenza_ora, corso.scadenza_ore_prima, corso.scadenza_giorni_prima)}
+                    {attivi} orari attivi ·{" "}
+                    {corso.usa_corsie ? `fino a ${corso.corsie_max * corso.persone_per_corsia} posti` : `${corso.capienza} posti`}
+                    {corso.abbonabile &&
+                      ` · conferma ${descriviScadenza(corso.scadenza_modo, corso.scadenza_ora, corso.scadenza_ore_prima, corso.scadenza_giorni_prima)}`}
                   </p>
                 </div>
                 <p className="-mt-2 mb-4 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
-                  <span>{corso.giorni_abbonamento} {corso.giorni_abbonamento === 1 ? "giorno fisso" : "giorni fissi"} per abbonato</span>
+                  <span>
+                    {corso.abbonabile
+                      ? `${corso.giorni_abbonamento} ${corso.giorni_abbonamento === 1 ? "giorno fisso" : "giorni fissi"} per abbonato`
+                      : "niente abbonamenti: ingressi singoli e carnet"}
+                  </span>
+                  {corso.usa_corsie && <span>{corso.corsie_max} corsie × {corso.persone_per_corsia} persone</span>}
                   <span>disdetta {corso.disdetta_ore_prima > 0 ? `fino a ${corso.disdetta_ore_prima} h prima` : "fino all'inizio"}</span>
                   <span>
                     ingressi dall&apos;app: {corso.ingressi_clienti ? `${corso.ingressi_da === "subito" ? "subito" : "dopo l'orario limite"}, ${corso.prenotabile_giorni} gg prima` : "no"}
@@ -88,6 +96,16 @@ export default async function CorsiPage({ searchParams }: { searchParams: Search
                   {corso.prezzo_ingresso !== null && <span>ingresso {euro(corso.prezzo_ingresso)}</span>}
                   {corso.prezzo_abbonamento !== null && <span>abbonamento {euro(corso.prezzo_abbonamento)}</span>}
                 </p>
+
+                {(() => {
+                  const primo = corso.orari_corso.filter((o) => o.attivo).sort((a, b) => a.giorno_settimana - b.giorno_settimana || a.ora_inizio.localeCompare(b.ora_inizio))[0];
+                  return primo && corso.abbonabile ? (
+                    <p className="mb-4 rounded-xl bg-schiuma px-3 py-2 text-sm text-slate-700">
+                      🕔{" "}
+                      {esempioScadenza(corso.scadenza_modo, corso.scadenza_ora, corso.scadenza_ore_prima, corso.scadenza_giorni_prima, primo.giorno_settimana, primo.ora_inizio)}
+                    </p>
+                  ) : null;
+                })()}
 
                 {/* ---------- Impostazioni ---------- */}
                 <details className="mb-5 rounded-xl border border-slate-200 p-4" open={aperto === corso.id}>
@@ -135,36 +153,54 @@ export default async function CorsiPage({ searchParams }: { searchParams: Search
                   </div>
                 </details>
 
-                {/* ---------- Orari per giorno ---------- */}
-                <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Orari settimanali</h3>
+                {/* ---------- Settimana tipo: una griglia giorni × ore ---------- */}
+                <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Settimana tipo</h3>
                 {corso.orari_corso.length === 0 ? (
                   <p className="mb-4 text-sm text-slate-500">Nessun orario ancora: aggiungili qui sotto.</p>
                 ) : (
-                  <div className="mb-5 divide-y divide-slate-100 rounded-xl border border-slate-200">
-                    {[1, 2, 3, 4, 5, 6, 7]
-                      .filter((g) => perGiorno.has(g))
-                      .map((g) => (
-                        <div key={g} className="flex flex-wrap items-center gap-2 px-3 py-2.5">
-                          <span className="w-12 shrink-0 text-sm font-medium">{GIORNI_BREVI[g]}</span>
-                          {[...(perGiorno.get(g) ?? [])]
-                            .sort((a, b) => a.ora_inizio.localeCompare(b.ora_inizio))
-                            .map((o) => (
-                              <Link
-                                key={o.id}
-                                href={`/admin/corsi/orari/${o.id}`}
-                                title={o.attivo ? "Tocca per modificare o sospendere" : "Sospeso: tocca per riattivarlo"}
-                                className={`relative inline-flex min-h-[36px] items-center rounded-lg border px-2.5 text-sm tabular-nums ${
-                                  o.attivo ? "border-slate-300 bg-white hover:border-acqua" : "border-dashed border-slate-300 bg-slate-50 text-slate-400 line-through"
-                                }`}
-                              >
-                                {ora(o.ora_inizio)}
-                                {(o.capienza !== null || o.scadenza_modo !== null) && (
-                                  <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-corsia" title="Personalizzato" />
-                                )}
-                              </Link>
-                            ))}
-                        </div>
-                      ))}
+                  <div className="mb-5 overflow-x-auto rounded-xl border border-slate-200">
+                    <table className="w-full min-w-[560px] border-collapse text-sm">
+                      <thead>
+                        <tr className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                          <th className="w-16 px-2 py-2 text-left font-medium">Ora</th>
+                          {GIORNI_BREVI.slice(1).map((g) => (
+                            <th key={g} className="px-1 py-2 font-medium">{g}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...new Set(corso.orari_corso.map((o) => o.ora_inizio))].sort().map((oraRiga) => (
+                          <tr key={oraRiga} className="border-t border-slate-100">
+                            <td className="px-2 py-1 tabular-nums text-slate-500">{ora(oraRiga)}</td>
+                            {[1, 2, 3, 4, 5, 6, 7].map((g) => {
+                              const o = (perGiorno.get(g) ?? []).find((x) => x.ora_inizio === oraRiga);
+                              if (!o) return <td key={g} className="px-1 py-1 text-center text-slate-200">·</td>;
+                              const etichettaCella = corso.usa_corsie
+                                ? `${o.corsie ?? corso.corsie_max} c`
+                                : `${o.capienza ?? corso.capienza} p`;
+                              return (
+                                <td key={g} className="px-1 py-1 text-center">
+                                  <Link
+                                    href={`/admin/corsi/orari/${o.id}`}
+                                    title={`${o.durata_minuti} min · tocca per modificare, spostare o sospendere`}
+                                    className={`relative inline-flex min-h-[34px] w-full items-center justify-center rounded-lg border px-1 text-xs tabular-nums ${
+                                      o.attivo
+                                        ? "border-slate-300 bg-white hover:border-acqua"
+                                        : "border-dashed border-slate-300 bg-slate-50 text-slate-400 line-through"
+                                    }`}
+                                  >
+                                    {etichettaCella}
+                                    {(o.capienza !== null || o.corsie !== null || o.scadenza_modo !== null) && (
+                                      <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-corsia" />
+                                    )}
+                                  </Link>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )}
 
@@ -179,8 +215,8 @@ export default async function CorsiPage({ searchParams }: { searchParams: Search
                 </details>
 
                 <p className="mt-3 text-xs text-slate-500">
-                  <span className="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-corsia align-middle" /> orario con posti o scadenza
-                  personalizzati · barrato = sospeso
+                  {corso.usa_corsie ? "c = corsie aperte" : "p = posti"} · <span className="mx-1 inline-block h-2.5 w-2.5 rounded-full bg-corsia align-middle" />
+                  personalizzato · barrato = sospeso · tocca una casella per cambiare giorno, ora, durata o {corso.usa_corsie ? "corsie" : "posti"}
                 </p>
               </Card>
             </section>
