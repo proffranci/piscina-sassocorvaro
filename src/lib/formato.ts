@@ -180,3 +180,39 @@ export function euroInLettere(importo: number | string) {
   const centesimi = Math.round(Number(importo) * 100);
   return `${numeroInLettere(Math.floor(centesimi / 100))}/${String(centesimi % 100).padStart(2, "0")}`;
 }
+
+// ---------- L'orario limite spiegato con un esempio ----------
+const NOMI_GIORNI = ["", "lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"];
+const hhmmDa = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+
+// "Per la lezione di lunedì alle 19:00 gli abbonati devono confermare entro lunedì alle 17:00…"
+export function esempioScadenza(
+  modo: string | null | undefined,
+  oraFissa: string | null | undefined,
+  orePrima: number | null | undefined,
+  giorniPrima: number | null | undefined,
+  giorno: number,
+  oraInizio: string,
+) {
+  const lezione = `Per la lezione di ${NOMI_GIORNI[giorno]} alle ${oraInizio.slice(0, 5)}`;
+  if (modo === "nessuna") return `${lezione} gli abbonati non devono confermare: il loro posto resta sempre valido.`;
+  const [h, m] = oraInizio.split(":").map(Number);
+  const inizio = h * 60 + m;
+  let gg = 0; // giorni prima
+  let minuti: number;
+  if (modo === "ore_prima") {
+    minuti = inizio - (orePrima ?? 2) * 60;
+    while (minuti < 0) {
+      minuti += 1440;
+      gg += 1;
+    }
+  } else {
+    const [fh, fm] = (oraFissa ?? (modo === "giorno_prima" ? "21:00" : "17:00")).split(":").map(Number);
+    minuti = fh * 60 + fm;
+    gg = modo === "giorno_prima" ? (giorniPrima ?? 1) : 0;
+    if (gg === 0 && minuti > inizio) minuti = inizio; // mai dopo l'inizio
+  }
+  const giornoLimite = ((giorno - 1 - (gg % 7) + 7) % 7) + 1;
+  const quandoLimite = gg === 0 ? `${NOMI_GIORNI[giornoLimite]} stesso` : gg >= 7 ? `${gg} giorni prima` : NOMI_GIORNI[giornoLimite];
+  return `${lezione} gli abbonati devono confermare entro ${quandoLimite} alle ${hhmmDa(minuti)}. Chi non conferma perde il posto, che passa agli ingressi singoli.`;
+}

@@ -6,8 +6,15 @@ import { etichettaGiorno, giornoChiave, oraDi, quando } from "@/lib/formato";
 import { prenota } from "../actions";
 import { postiLiberi, type LezioneBase } from "../dati";
 
-type RegoleCorso = { nome: string; ingressi_clienti: boolean; ingressi_da: string; prenotabile_giorni: number };
-type Lezione = Omit<LezioneBase, "corsi"> & { corso_id: string; corsi: RegoleCorso | null };
+type RegoleCorso = {
+  nome: string;
+  ingressi_clienti: boolean;
+  ingressi_da: string;
+  prenotabile_giorni: number;
+  disdetta_ore_prima: number;
+  descrizione: string | null;
+};
+type Lezione = Omit<LezioneBase, "corsi"> & { corso_id: string; corsie: number | null; corsi: RegoleCorso | null };
 
 const GIORNO = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -21,7 +28,9 @@ export default async function PrenotaPage({ searchParams }: { searchParams: Sear
   const [lezioniRes, mieRes] = await Promise.all([
     supabase
       .from("lezioni")
-      .select("id, inizio, capienza, scadenza_conferma, annullata, corso_id, corsi!inner(nome, ingressi_clienti, ingressi_da, prenotabile_giorni, attivo)")
+      .select(
+        "id, inizio, capienza, corsie, scadenza_conferma, annullata, corso_id, corsi!inner(nome, ingressi_clienti, ingressi_da, prenotabile_giorni, disdetta_ore_prima, descrizione, attivo)",
+      )
       .eq("annullata", false)
       .eq("corsi.attivo", true)
       .eq("corsi.ingressi_clienti", true)
@@ -34,7 +43,9 @@ export default async function PrenotaPage({ searchParams }: { searchParams: Sear
     (l) => !!l.corsi && new Date(l.inizio).getTime() <= adesso.getTime() + l.corsi.prenotabile_giorni * 86_400_000,
   );
   // "Solo dopo l'orario limite": prima di allora i posti restano agli abbonati
-  const siApre = (l: Lezione) => (l.corsi?.ingressi_da === "dopo_scadenza" && new Date(l.scadenza_conferma) > adesso ? l.scadenza_conferma : null);
+  // (se l'orario limite coincide con l'inizio, cioè "nessuna conferma", la regola non vale)
+  const siApre = (l: Lezione) =>
+    l.corsi?.ingressi_da === "dopo_scadenza" && new Date(l.scadenza_conferma) > adesso && l.scadenza_conferma < l.inizio ? l.scadenza_conferma : null;
   const giaMie = new Set(((mieRes.data ?? []) as { lezione_id: string }[]).map((r) => r.lezione_id));
 
   // Corsi e giorni disponibili
@@ -85,6 +96,17 @@ export default async function PrenotaPage({ searchParams }: { searchParams: Sear
             </div>
           )}
 
+          {/* Regole del corso, in breve */}
+          {delCorso[0]?.corsi && (
+            <p className="mb-3 text-xs text-slate-500">
+              {delCorso[0].corsi.descrizione ? `${delCorso[0].corsi.descrizione} · ` : ""}
+              prenotabile fino a {delCorso[0].corsi.prenotabile_giorni} giorni prima ·{" "}
+              {delCorso[0].corsi.disdetta_ore_prima > 0
+                ? `si può disdire fino a ${delCorso[0].corsi.disdetta_ore_prima} ${delCorso[0].corsi.disdetta_ore_prima === 1 ? "ora" : "ore"} prima`
+                : "si può disdire fino all'inizio"}
+            </p>
+          )}
+
           {/* Giorno */}
           <nav className="-mx-4 mb-5 flex gap-2 overflow-x-auto px-4 pb-1" aria-label="Giorno">
             {giorni.map((g) => (
@@ -112,11 +134,12 @@ export default async function PrenotaPage({ searchParams }: { searchParams: Sear
                   className={`rounded-2xl border bg-white p-3 shadow-sm ${mia ? "border-emerald-300 bg-emerald-50" : liberi === 0 ? "border-slate-200 opacity-60" : "border-slate-200"}`}
                 >
                   <p className="text-xl font-bold tabular-nums">{oraDi(l.inizio)}</p>
+                  {l.corsie && <p className="text-xs text-slate-500">{l.corsie} {l.corsie === 1 ? "corsia aperta" : "corsie aperte"}</p>}
                   <p className={`mb-2 text-xs ${liberi > 0 ? "text-slate-600" : "text-red-700"}`}>
                     {mia ? "✓ Già prenotato" : liberi > 0 ? `${liberi} ${liberi === 1 ? "posto libero" : "posti liberi"}` : "Al completo"}
                   </p>
                   {!mia && liberi > 0 && apertura && (
-                    <p className="rounded-lg bg-slate-100 px-2 py-2 text-center text-xs text-slate-600">Si prenota da {quando(apertura)}</p>
+                    <p className="rounded-lg bg-slate-100 px-2 py-2 text-center text-xs text-slate-600">Posti tenuti per gli abbonati: si prenota da {quando(apertura)}</p>
                   )}
                   {!mia && liberi > 0 && !apertura && (
                     <form action={prenota}>

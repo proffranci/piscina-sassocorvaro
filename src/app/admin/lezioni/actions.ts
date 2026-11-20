@@ -135,6 +135,7 @@ export async function modificaLezione(formData: FormData) {
     p_lezione: id,
     p_capienza: Number(testo(formData, "capienza")),
     p_scadenza_locale: testo(formData, "scadenza"),
+    p_corsie: testo(formData, "corsie") ? Number(testo(formData, "corsie")) : null,
   });
   if (error) esito(pagina, "errore", messaggioDb(error, "Modifica non riuscita."));
   esito(pagina, "ok", "Lezione aggiornata.");
@@ -154,4 +155,17 @@ export async function annullaLezione(formData: FormData) {
   if (error) esito(pagina, "errore", messaggioDb(error, "Operazione non riuscita."));
   const n = Number(data ?? 0);
   esito(pagina, "ok", `${annulla ? "Lezione annullata" : "Lezione ripristinata"}${n > 0 ? `: ${n} ${n === 1 ? "persona avvisata" : "persone avvisate"}` : ""}.`);
+}
+
+// Assegna (o cambia) la corsia di una persona in questa lezione
+export async function assegnaCorsia(formData: FormData) {
+  const { supabase } = await richiediStaff();
+  const pagina = `/admin/lezioni/${testo(formData, "lezione_id")}`;
+  const corsia = testo(formData, "corsia");
+  const { error } = await supabase.rpc("assegna_corsia", {
+    p_prenotazione: testo(formData, "prenotazione_id"),
+    p_corsia: corsia ? Number(corsia) : null,
+  });
+  if (error) esito(pagina, "errore", messaggioDb(error, "Corsia non salvata."));
+  esito(pagina, "ok", corsia ? `Assegnata la corsia ${corsia}.` : "Corsia tolta.");
 }

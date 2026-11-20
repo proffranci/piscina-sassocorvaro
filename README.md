@@ -56,6 +56,7 @@ src/app/area           area del cliente
   - ingresso: QR personale nell'app (Tessera), tessera stampabile, tessere/braccialetti RFID-NFC; la reception legge con la fotocamera, con un lettore USB o con l'NFC del telefono Android e vede subito verde/giallo/rosso
 - [x] **Pagamenti verificati** (script `0014`): "pagato" non si cambia più a mano, lo calcola il database dai pagamenti con ricevuta; quelli registrati dallo staff restano "in verifica" finché l'admin non li conferma; "Ha saldato" in un clic dalla scheda utente; il cliente riceve "Abbonamento saldato ✓"
 - [x] **Ingresso guidato e scadenza del pagamento** (script `0015`): lettura → finestra con lezioni di oggi, abbonamenti e avvisi → "cosa entra a fare?" (lezione prenotata, ingresso singolo con pagamento e ricevuta, altro con nota); registro ingressi di qualsiasi giorno con ricerca; "da pagare entro" con ⚠️ solo nell'ultima settimana e promemoria automatico al cliente
+- [x] **Corsie, carnet, settimana tipo** (script `0016`): corsi a corsie (nuoto libero: 5 corsie × 7 persone, corsie aperte per turno e per singolo giorno, corsia assegnata in reception); carnet a ingressi; griglia della settimana tipo e orari spostabili (giorno, ora, durata); orario limite spiegato con un esempio; chiudere in anticipo o eliminare un abbonamento; disdetta fino a 2 ore prima e prenotazioni a 1 settimana
 - [ ] **Email** – promemoria anche via email
 - [ ] **Fase 3** – prenotazione corsie
 - [ ] **Fase 4** – WhatsApp, report, rifiniture grafiche

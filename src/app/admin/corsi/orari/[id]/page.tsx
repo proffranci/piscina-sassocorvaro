@@ -4,7 +4,7 @@ import { BottoneInvio } from "@/components/BottoneInvio";
 import { CampiScadenza } from "@/components/CampiScadenza";
 import { Avviso, Badge, Card, Titolo, bottone, bottoneSecondario, campo, etichetta, parametro, type SearchParams } from "@/components/ui";
 import { richiediStaff } from "@/lib/sessione";
-import { descriviScadenza, nomeGiorno, ora } from "@/lib/formato";
+import { descriviScadenza, esempioScadenza, nomeGiorno, ora } from "@/lib/formato";
 import { aggiornaOrario, eliminaOrario, sospendiOrario } from "../../actions";
 
 type Orario = {
@@ -15,6 +15,7 @@ type Orario = {
   durata_minuti: number;
   attivo: boolean;
   capienza: number | null;
+  corsie: number | null;
   scadenza_modo: string | null;
   scadenza_ora: string | null;
   scadenza_ore_prima: number | null;
@@ -26,6 +27,9 @@ type Orario = {
     scadenza_ora: string;
     scadenza_ore_prima: number;
     scadenza_giorni_prima: number;
+    usa_corsie: boolean;
+    corsie_max: number;
+    persone_per_corsia: number;
   } | null;
 };
 type Abbonato = { abbonamenti: { id: string; tipo: string; data_fine: string; profili: { nome: string; cognome: string } | null } | null };
@@ -40,7 +44,7 @@ export default async function OrarioPage({ params, searchParams }: { params: Pro
     supabase
       .from("orari_corso")
       .select(
-        "id, corso_id, giorno_settimana, ora_inizio, durata_minuti, attivo, capienza, scadenza_modo, scadenza_ora, scadenza_ore_prima, scadenza_giorni_prima, corsi(nome, capienza, scadenza_modo, scadenza_ora, scadenza_ore_prima, scadenza_giorni_prima)",
+        "id, corso_id, giorno_settimana, ora_inizio, durata_minuti, attivo, capienza, corsie, scadenza_modo, scadenza_ora, scadenza_ore_prima, scadenza_giorni_prima, corsi(nome, capienza, scadenza_modo, scadenza_ora, scadenza_ore_prima, scadenza_giorni_prima, usa_corsie, corsie_max, persone_per_corsia)",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -68,19 +72,54 @@ export default async function OrarioPage({ params, searchParams }: { params: Pro
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <Card>
-          <h2 className="mb-4 font-semibold">Personalizza questo orario</h2>
+          <h2 className="mb-4 font-semibold">Modifica questo orario</h2>
           <form action={aggiornaOrario} className="space-y-4">
             <input type="hidden" name="id" value={o.id} />
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div>
+                <label className={etichetta} htmlFor="giorno">Giorno</label>
+                <select id="giorno" name="giorno_settimana" defaultValue={o.giorno_settimana} className={campo}>
+                  {[1, 2, 3, 4, 5, 6, 7].map((g) => (
+                    <option key={g} value={g}>
+                      {nomeGiorno(g)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={etichetta} htmlFor="ora_inizio">Ora di inizio</label>
+                <input id="ora_inizio" name="ora_inizio" type="time" required defaultValue={o.ora_inizio.slice(0, 5)} className={campo} />
+              </div>
               <div>
                 <label className={etichetta} htmlFor="durata">Durata (minuti)</label>
                 <input id="durata" name="durata_minuti" type="number" min={15} max={240} step={5} defaultValue={o.durata_minuti} className={campo} />
               </div>
-              <div>
-                <label className={etichetta} htmlFor="capienza">Posti</label>
-                <input id="capienza" name="capienza" type="number" min={1} max={500} defaultValue={o.capienza ?? ""} placeholder={`come il corso (${c.capienza})`} className={campo} />
-              </div>
+              {c.usa_corsie ? (
+                <div className="sm:col-span-3">
+                  <label className={etichetta} htmlFor="corsie">Corsie aperte</label>
+                  <select id="corsie" name="corsie" defaultValue={o.corsie ?? ""} className={campo}>
+                    <option value="">Tutte ({c.corsie_max} corsie = {c.corsie_max * c.persone_per_corsia} posti)</option>
+                    {Array.from({ length: c.corsie_max }, (_, i) => i + 1).map((n) => (
+                      <option key={n} value={n}>
+                        {n} {n === 1 ? "corsia" : "corsie"} = {n * c.persone_per_corsia} posti
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {c.persone_per_corsia} persone per corsia. Per un solo giorno (es. gara, corso) cambiale dalla lezione.
+                  </p>
+                </div>
+              ) : (
+                <div className="sm:col-span-3">
+                  <label className={etichetta} htmlFor="capienza">Posti</label>
+                  <input id="capienza" name="capienza" type="number" min={1} max={500} defaultValue={o.capienza ?? ""} placeholder={`come il corso (${c.capienza})`} className={campo} />
+                </div>
+              )}
             </div>
+            <p className="rounded-lg bg-schiuma px-3 py-2 text-xs text-slate-600">
+              Cambiando giorno o ora, le lezioni future si rifanno al nuovo orario: chi era prenotato riceve un avviso e gli abbonati
+              con questo giorno fisso lo seguono.
+            </p>
             <CampiScadenza
               id={o.id}
               conEreditata
@@ -92,12 +131,20 @@ export default async function OrarioPage({ params, searchParams }: { params: Pro
             <p className="text-xs text-slate-500">
               Il corso conferma {descriviScadenza(c.scadenza_modo, c.scadenza_ora, c.scadenza_ore_prima, c.scadenza_giorni_prima)}. Scegli &quot;Come il corso&quot; per
               non personalizzare.
+              <br />
+              <strong>
+                {esempioScadenza(
+                  o.scadenza_modo ?? c.scadenza_modo,
+                  o.scadenza_ora ?? c.scadenza_ora,
+                  o.scadenza_ore_prima ?? c.scadenza_ore_prima,
+                  o.scadenza_giorni_prima ?? c.scadenza_giorni_prima,
+                  o.giorno_settimana,
+                  o.ora_inizio,
+                )}
+              </strong>
             </p>
             <BottoneInvio className={`${bottone} w-full sm:w-auto`}>Salva</BottoneInvio>
           </form>
-          <p className="mt-4 text-xs text-slate-500">
-            Per cambiare giorno o ora: aggiungi il nuovo orario in &quot;Corsi e orari&quot; e sospendi questo (poi sposta gli abbonati).
-          </p>
         </Card>
 
         <div className="space-y-6">

@@ -6,7 +6,7 @@ import { Avviso, Card, Titolo, bottone, bottoneSecondario, campo, etichetta, par
 import { richiediStaff } from "@/lib/sessione";
 import { etichettaGiorno, oraDi, perCampoDataOra, quando } from "@/lib/formato";
 import { contaPosti, type StatoPrenotazione, type TipoPrenotazione } from "@/lib/posti";
-import { aggiungiIngresso, annullaLezione, confermaIngresso, confermaPerConto, liberaPosto, modificaLezione } from "../actions";
+import { aggiungiIngresso, annullaLezione, assegnaCorsia, confermaIngresso, confermaPerConto, liberaPosto, modificaLezione } from "../actions";
 import { BottoneInvio } from "@/components/BottoneInvio";
 
 type Prenotazione = {
@@ -17,6 +17,7 @@ type Prenotazione = {
   da_confermare_staff: boolean;
   confermata_il: string | null;
   entrato_il: string | null;
+  corsia: number | null;
   profili: { nome: string; cognome: string; telefono: string | null; email: string | null } | null;
 };
 
@@ -30,7 +31,8 @@ type Lezione = {
   personalizzata: boolean;
   motivo_annullamento: string | null;
   orario_corso_id: string | null;
-  corsi: { nome: string } | null;
+  corsie: number | null;
+  corsi: { nome: string; usa_corsie: boolean; corsie_max: number; persone_per_corsia: number } | null;
   prenotazioni: Prenotazione[];
 };
 
@@ -54,7 +56,7 @@ export default async function LezionePage({
     supabase
       .from("lezioni")
       .select(
-        "id, inizio, fine, capienza, scadenza_conferma, annullata, personalizzata, motivo_annullamento, orario_corso_id, corsi(nome), prenotazioni(id, stato, tipo, nome_ospite, confermata_il, entrato_il, da_confermare_staff, profili(nome, cognome, telefono, email))",
+        "id, inizio, fine, capienza, corsie, scadenza_conferma, annullata, personalizzata, motivo_annullamento, orario_corso_id, corsi(nome, usa_corsie, corsie_max, persone_per_corsia), prenotazioni(id, stato, tipo, nome_ospite, confermata_il, entrato_il, corsia, da_confermare_staff, profili(nome, cognome, telefono, email))",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -133,6 +135,22 @@ export default async function LezionePage({
           </p>
         </div>
         <BarraPosti conteggio={c} legenda />
+        {lezione.corsie && lezione.corsi && (
+          <div className="mt-4 grid gap-2" style={{ gridTemplateColumns: `repeat(${lezione.corsie}, minmax(0, 1fr))` }}>
+            {Array.from({ length: lezione.corsie }, (_, i) => i + 1).map((n) => {
+              const dentro = lezione.prenotazioni.filter((p) => p.corsia === n && (p.stato === "confermata" || p.stato === "riservata")).length;
+              const max = lezione.corsi!.persone_per_corsia;
+              return (
+                <div key={n} className={`rounded-lg px-2 py-2 text-center text-xs ${dentro >= max ? "bg-red-50 text-red-800" : "bg-schiuma"}`}>
+                  <p className="font-semibold">Corsia {n}</p>
+                  <p className="tabular-nums">
+                    {dentro}/{max}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
@@ -151,6 +169,26 @@ export default async function LezionePage({
                     <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
                       <span>
                         <span className="font-medium">{nomeDi(p)}</span>
+                        {lezione.corsie && (p.stato === "confermata" || p.stato === "riservata") && (
+                          <form action={assegnaCorsia} className="ml-2 inline-flex items-center gap-1">
+                            <input type="hidden" name="prenotazione_id" value={p.id} />
+                            <input type="hidden" name="lezione_id" value={lezione.id} />
+                            <select
+                              name="corsia"
+                              defaultValue={p.corsia ?? ""}
+                              aria-label="Corsia"
+                              className="rounded-md border border-slate-300 bg-white px-1 py-0.5 text-xs"
+                            >
+                              <option value="">corsia?</option>
+                              {Array.from({ length: lezione.corsie }, (_, i) => i + 1).map((n) => (
+                                <option key={n} value={n}>
+                                  corsia {n}
+                                </option>
+                              ))}
+                            </select>
+                            <button type="submit" className="text-xs text-vasca underline">ok</button>
+                          </form>
+                        )}
                         {p.entrato_il && (
                           <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
                             🚪 entrato {oraDi(p.entrato_il)}
@@ -264,10 +302,24 @@ export default async function LezionePage({
             </p>
             <form action={modificaLezione} className="grid gap-4 sm:grid-cols-2">
               <input type="hidden" name="lezione_id" value={lezione.id} />
-              <div>
-                <label className={etichetta} htmlFor="capienza">Posti</label>
-                <input id="capienza" name="capienza" type="number" min={1} max={500} defaultValue={lezione.capienza} className={campo} />
-              </div>
+              {lezione.corsi?.usa_corsie ? (
+                <div>
+                  <label className={etichetta} htmlFor="corsie">Corsie aperte</label>
+                  <select id="corsie" name="corsie" defaultValue={lezione.corsie ?? lezione.corsi.corsie_max} className={campo}>
+                    {Array.from({ length: lezione.corsi.corsie_max }, (_, i) => i + 1).map((n) => (
+                      <option key={n} value={n}>
+                        {n} {n === 1 ? "corsia" : "corsie"} = {n * lezione.corsi!.persone_per_corsia} posti
+                      </option>
+                    ))}
+                  </select>
+                  <input type="hidden" name="capienza" value={lezione.capienza} />
+                </div>
+              ) : (
+                <div>
+                  <label className={etichetta} htmlFor="capienza">Posti</label>
+                  <input id="capienza" name="capienza" type="number" min={1} max={500} defaultValue={lezione.capienza} className={campo} />
+                </div>
+              )}
               <div>
                 <label className={etichetta} htmlFor="scadenza">Scadenza conferma abbonati</label>
                 <input id="scadenza" name="scadenza" type="datetime-local" defaultValue={perCampoDataOra(lezione.scadenza_conferma)} className={campo} />
