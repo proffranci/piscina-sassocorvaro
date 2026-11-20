@@ -41,7 +41,7 @@ export default async function LezioniPage({ searchParams }: { searchParams: Sear
 
   // Prendo un po' di margine attorno al giorno e poi filtro in ora italiana
   const centro = new Date(`${giorno}T12:00:00Z`).getTime();
-  const [lezRes, corsiRes] = await Promise.all([
+  const [lezRes, corsiRes, quanteRes] = await Promise.all([
     supabase
       .from("lezioni")
       .select("id, inizio, capienza, scadenza_conferma, annullata, corso_id, corsi(nome), prenotazioni(stato, tipo, da_confermare_staff)")
@@ -49,7 +49,22 @@ export default async function LezioniPage({ searchParams }: { searchParams: Sear
       .lt("inizio", new Date(centro + 20 * 3_600_000).toISOString())
       .order("inizio"),
     supabase.from("corsi").select("id, nome").eq("attivo", true).order("nome"),
+    // Quante lezioni ci sono in ognuno dei 14 giorni (per i numerini sulla striscia)
+    supabase
+      .from("lezioni")
+      .select("inizio, corso_id")
+      .eq("annullata", false)
+      .gte("inizio", new Date(Date.now() - 86_400_000).toISOString())
+      .lt("inizio", new Date(Date.now() + 15 * 86_400_000).toISOString())
+      .limit(5000),
   ]);
+  const quante = new Map<string, number>();
+  for (const l of (quanteRes.data ?? []) as { inizio: string; corso_id: string }[]) {
+    if (corsoScelto && l.corso_id !== corsoScelto) continue;
+    const k = giornoChiave(l.inizio);
+    quante.set(k, (quante.get(k) ?? 0) + 1);
+  }
+  const prossimiConLezioni = giorni.filter((g) => g.chiave > giorno && (quante.get(g.chiave) ?? 0) > 0).slice(0, 3);
   const corsi = (corsiRes.data ?? []) as { id: string; nome: string }[];
   const tutte = ((lezRes.data ?? []) as unknown as Lezione[]).filter((l) => giornoChiave(l.inizio) === giorno);
   const lezioni = corsoScelto ? tutte.filter((l) => l.corso_id === corsoScelto) : tutte;
@@ -88,11 +103,16 @@ export default async function LezioniPage({ searchParams }: { searchParams: Sear
           <Link
             key={g.chiave}
             href={link(g.chiave, corsoScelto)}
-            className={`inline-flex min-h-[44px] shrink-0 items-center rounded-xl border px-3 text-sm capitalize ${
-              g.chiave === giorno ? "border-abisso bg-abisso text-white" : "border-slate-300 bg-white hover:bg-schiuma"
+            className={`inline-flex min-h-[44px] shrink-0 flex-col items-center justify-center rounded-xl border px-3 text-sm capitalize ${
+              g.chiave === giorno
+                ? "border-abisso bg-abisso text-white"
+                : (quante.get(g.chiave) ?? 0) > 0
+                  ? "border-slate-300 bg-white hover:bg-schiuma"
+                  : "border-slate-200 bg-slate-50 text-slate-400"
             }`}
           >
             {g.breve}
+            <span className="text-[10px] leading-none opacity-80">{quante.get(g.chiave) ? `${quante.get(g.chiave)} lez.` : "—"}</span>
           </Link>
         ))}
       </nav>
@@ -117,9 +137,24 @@ export default async function LezioniPage({ searchParams }: { searchParams: Sear
       {lezioni.length === 0 && (
         <Card>
           <p className="text-sm text-slate-600">
-            Nessuna lezione in questo giorno. Controlla gli orari in{" "}
-            <Link href="/admin/corsi" className="text-vasca underline">Corsi e orari</Link>.
+            Nessuna lezione in questo giorno
+            {corsoScelto ? " per questo corso" : ""}.
           </p>
+          {prossimiConLezioni.length > 0 ? (
+            <p className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+              Le prossime:
+              {prossimiConLezioni.map((g) => (
+                <Link key={g.chiave} href={link(g.chiave, corsoScelto)} className={`${bottoneSecondario} capitalize`}>
+                  {g.breve} ({quante.get(g.chiave)})
+                </Link>
+              ))}
+            </p>
+          ) : (
+            <p className="mt-2 text-sm text-slate-600">
+              Nessuna nemmeno nei prossimi giorni: premi &quot;↻ Aggiorna calendario&quot; qui sopra oppure controlla gli orari in{" "}
+              <Link href="/admin/corsi" className="text-vasca underline">Corsi e orari</Link>.
+            </p>
+          )}
         </Card>
       )}
 
@@ -142,7 +177,15 @@ export default async function LezioniPage({ searchParams }: { searchParams: Sear
                         <div>
                           <p className="text-lg font-semibold tabular-nums">{oraDi(l.inizio)}</p>
                           <p className="text-xs text-slate-500">
-                            {l.annullata ? "Annullata" : finita ? "Iniziata" : scaduta ? "Conferme chiuse" : `Conferme entro ${quando(l.scadenza_conferma)}`}
+                            {l.annullata
+                              ? "Annullata"
+                              : finita
+                                ? "Iniziata"
+                                : new Date(l.scadenza_conferma) >= new Date(l.inizio)
+                                  ? "Senza conferma"
+                                  : scaduta
+                                    ? "Conferme chiuse"
+                                    : `Conferme entro ${quando(l.scadenza_conferma)}`}
                           </p>
                         </div>
                         <div className="flex flex-col items-end gap-1">
